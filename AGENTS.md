@@ -1,0 +1,144 @@
+# AGENTS.md
+
+Instructions communes aux agents IA. Ce fichier ne contient **que des règles stables** : aucun état d'avancement,
+aucun hash de commit, aucun nombre de tests. L'état réel se lit dans `Backlog.md` et dans `git log`.
+
+## 1. Projet
+
+- API REST d'un MMORPG inspiré de World of Warcraft. **Backend uniquement**, jamais de Front-End.
+- Projet étudiant de 3ᵉ année de Bachelor, réalisé en **4 jours**. Viser un parcours complet, propre et testé,
+  pas un grand nombre de fonctionnalités : rien n'est développé hors de `Backlog.md`.
+- L'agent agit comme un développeur backend expérimenté : il explique ses choix et leurs conséquences,
+  sans simplifier à l'excès ni ajouter d'abstraction inutile.
+- **Règle fondamentale : le serveur ne fait jamais confiance au client.** Statistiques, dégâts, XP, niveaux, butin
+  et droits sont calculés et vérifiés côté serveur. Le client transmet une intention.
+
+## 2. Documents : une source par sujet
+
+| Sujet | Source unique |
+|---|---|
+| Tickets, ordre, critères, **statut** | `Backlog.md` |
+| Règles de jeu chiffrées | `docs/rules.md` |
+| Architecture et exemple de code de référence | `docs/architecture.md` |
+| Contrat HTTP | `docs/conventions.md` |
+| Décisions d'un lot | `docs/lots/LN.md` (modèle : `docs/lots/_modele.md`) |
+| Installation, commandes | `README.md` |
+
+- Une règle n'est écrite qu'à un seul endroit ; les autres documents y renvoient.
+- En cas de contradiction, le code et `docs/` font foi : le signaler et proposer la correction.
+- **Une règle de jeu absente de `docs/rules.md` n'est jamais inventée** : elle devient une décision D à valider.
+- Avant d'écrire du code, relire l'exemple de `docs/architecture.md` et l'imiter.
+
+### En cas de doute : demander, ne pas inventer
+
+| Situation | Action |
+|---|---|
+| Règle de jeu, valeur chiffrée, code d'erreur ou forme de réponse absents des documents | **Demander** (décision D) |
+| Critère d'acceptation ambigu, contradictoire ou impossible | **Demander** |
+| Choix structurant : dépendance, schéma de base, changement de contrat, modification d'un document de référence | **Demander** |
+| Détail d'implémentation couvert par `docs/architecture.md` (nommage, emplacement, forme) | Décider seul en imitant l'exemple |
+
+- Pendant l'audit, toutes les questions sont posées d'un coup, avec une recommandation pour chacune.
+- Pendant la réalisation, une question imprévue arrête le travail : poser la question, avec le contexte et une
+  recommandation, puis attendre. Ne jamais choisir « provisoirement » une règle métier.
+- Toute hypothèse faite malgré tout est signalée explicitement dans le bilan, jamais passée sous silence.
+
+## 3. Stack (les versions de `package.json` font foi)
+
+| Domaine | Choix |
+|---|---|
+| Langage | Node.js 22, TypeScript strict, ESM ; build CommonJS par tsup |
+| HTTP | Express 4, Zod 4, Helmet, cors, express-rate-limit |
+| Base | PostgreSQL 18 (Docker Compose), Prisma 7 + `@prisma/adapter-pg`, identifiants UUID v7 générés par PostgreSQL |
+| Authentification | Session opaque (32 octets aléatoires, empreinte SHA-256 en base, 24 h), jeton `Bearer` ; mots de passe en Argon2id |
+| Logs | Pino, pino-http |
+| Tests | Vitest, Supertest ; validation manuelle avec Postman |
+| Configuration | `src/config/environment.ts`, `.env` chargé par `process.loadEnvFile()` (pas de dotenv) |
+
+Aucune autre dépendance sans décision D validée.
+
+## 4. Architecture : Clean Architecture et DDD
+
+Détail et exemple complet : `docs/architecture.md`. Les règles ci-dessous sont **non négociables**.
+
+| Couche | Contient | Peut importer |
+|---|---|---|
+| `src/domain/` | Agrégats, entités, objets-valeurs, règles de jeu, erreurs métier, **interfaces** des repositories | Rien d'autre que `domain/` |
+| `src/application/` | Un cas d'usage par action, ports techniques (`UnitOfWork`, `PasswordHasher`, `Clock`, `RandomSource`, `TokenGenerator`) | `domain/` |
+| `src/infrastructure/` | Implémentations Prisma, argon2, horloge, aléatoire | `domain/`, `application/` |
+| `src/interfaces/http/` | Routes, controllers, schémas Zod, présentateurs (DTO), middlewares | `application/` (et les types d'erreur du domaine) |
+| `src/main.ts` | Composition : construit l'infrastructure et l'injecte | Tout |
+
+- **Règle de dépendance** vérifiée par le test `tests/architecture.test.ts` : `domain/` n'importe ni Express, ni Prisma,
+  ni Zod, ni `application/` ; `application/` n'importe ni Express ni Prisma.
+- **Contextes :** `identity`, `characters`, `world`, `combat`, `inventory`. Un dossier par contexte dans chaque couche.
+- **Agrégats :** modifiés uniquement par leur racine ; référencés entre eux **par identifiant**.
+  Une transaction ne modifie qu'un agrégat, sauf la fin de combat (combat + personnage + inventaire), coordonnée par
+  un seul cas d'usage dans un `UnitOfWork`.
+- **Objets-valeurs** immuables, validés à la construction (`CharacterName.create(...)`).
+- **Règles de jeu** en méthodes du domaine ou fonctions pures ; paramètres de `rules.md` dans
+  `src/domain/shared/game-rules.ts`, jamais de valeur magique ailleurs.
+- **Concurrence :** tout état lu puis modifié est verrouillé dans la transaction (`SELECT … FOR UPDATE` via
+  `findByIdForUpdate`). Limite de 5 personnages : verrou sur le compte. Combat : verrou sur le combat.
+- **Erreurs :** le domaine lève `DomainError(code, kind)` sans connaître HTTP ; un seul middleware traduit `kind`
+  en statut. Une erreur de programmation (invariant violé) est une erreur ordinaire → 500.
+- **Lecture simple** (classes, monstres d'une zone) : un cas d'usage de lecture appelle un repository, sans agrégat.
+- Pas de bus d'événements, de CQRS, de mapper générique ni d'héritage de « BaseEntity » : inutile en 4 jours.
+- TypeScript strict, sans `any` ni transtypage injustifié.
+
+## 5. Sécurité (règles permanentes)
+
+- Mots de passe hachés ; jamais renvoyés ni journalisés.
+- Aucune réponse ne contient de secret, hash, jeton non voulu, variable d'environnement, trace ou requête SQL.
+- Aucun log ne contient de mot de passe, jeton, cookie, corps ou paramètre de requête, ni d'URL de connexion.
+- Propriété vérifiée dans chaque cas d'usage : la ressource d'un autre joueur est traitée exactement comme une
+  ressource inexistante. Il n'existe pas de rôle administrateur dans ce projet.
+- Tout champ ou paramètre inconnu est refusé (400), jamais ignoré.
+
+## 6. Tests
+
+| Dossier | Contenu | Commande |
+|---|---|---|
+| `tests/unit/domain/` | Agrégats et objets-valeurs, sans aucun double | `npm test` |
+| `tests/unit/application/` | Cas d'usage avec repositories en mémoire (`tests/fakes/`) | `npm test` |
+| `tests/integration/` | HTTP avec Supertest et repositories en mémoire ; jamais d'import de `main.ts` | `npm test` |
+| `tests/database/` | Repositories Prisma, concurrence, annulation de transaction, sur `mmorpg_test` uniquement | `npm run test:db` |
+| `tests/architecture.test.ts` | Règle de dépendance des couches | `npm test` |
+
+- Les exemples chiffrés de `rules.md` sont des tests obligatoires.
+- Un même contrat de repository s'exécute sur la version en mémoire et sur la version Prisma.
+- Ne jamais annoncer un test qui n'a pas été exécuté. Une compilation ne remplace pas les tests.
+
+## 7. Méthode de travail
+
+Un **lot** = les tickets d'une journée de `Backlog.md`. Une session par lot.
+
+| Phase | Commande | Fin de phase |
+|---|---|---|
+| 1. Audit (mode Plan) | `/audit-lot LN` | Décisions D et adaptations E validées par l'utilisateur |
+| 2. Réalisation | demande en texte libre, puis `/verifier` et l'agent `relecteur` | Bilan : fichiers, tests exécutés, diff, points restants |
+| 3. Livraison | `/livrer-lot LN` | Hash du commit, push, arbre propre |
+
+- Pendant la réalisation : avancer sans confirmation intermédiaire ; s'arrêter seulement sur un blocage ou une
+  décision imprévue.
+- Le commit et le push demandent chacun une **autorisation explicite**. Le silence n'est jamais une validation.
+
+## 8. Garde-fous
+
+Les commandes destructives sont bloquées par `.claude/settings.json`. En plus :
+- Ne modifier aucun fichier hors du périmètre du lot validé.
+- Migration : la générer, la relire, vérifier les données de `mmorpg_dev`, puis l'appliquer.
+- Tests manuels : serveur compilé sur `mmorpg_test`, comptes `*.lN@example.com`, nettoyage ciblé à la fin.
+- Ne jamais arrêter un processus que l'agent n'a pas lancé lui-même.
+- Une vérification impossible est signalée comme telle, jamais présentée comme réussie.
+
+## 9. Git
+
+- Branche `main`, un commit par lot : Conventional Commits en français avec les tickets,
+  par exemple `feat: combat tour par tour (WORLD-01, COMBAT-01 à COMBAT-03)`.
+- Jamais `.env`, secrets, `node_modules/` ou `dist/`.
+
+## 10. Communication
+
+- Français, précis, direct et pédagogique ; tableaux courts.
+- Distinguer ce qui a été vérifié, ce qui est proposé et ce qui reste à faire.
