@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{baseUrl}}/api/v1/characters/{{characterId}}"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('200, niveau 1 avec 25 XP (rules.md §8)', () => {
+          pm.response.to.have.status(200);
+          const data = pm.response.json().data;
+          pm.expect(data.level).to.eql(1);
+          pm.expect(data.experience).to.eql(25);
+      });
+    language: text/javascript
+order: 1000

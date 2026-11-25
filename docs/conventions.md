@@ -75,7 +75,7 @@ Le domaine lève une `DomainError` avec un `kind` ; un seul middleware la tradui
 | `CHARACTER_NAME_TAKEN` | 409 | Nom déjà pris, quelle que soit la casse | CHAR-02 |
 | `CHARACTER_LIMIT_REACHED` | 409 | 5 personnages déjà créés | CHAR-02 |
 | `CLASS_NOT_FOUND` | 422 | `classId` inconnu dans le corps | CHAR-02 |
-| `CHARACTER_NOT_FOUND` | 404 / 422 | Personnage inexistant ou d'un autre joueur (URL / corps) | CHAR-03, COMBAT-02 |
+| `CHARACTER_NOT_FOUND` | 404 / 422 | Personnage inexistant ou d'un autre joueur (URL / corps) | CHAR-03, COMBAT-02, INV-01 |
 | `ZONE_NOT_FOUND` | 404 | Zone inconnue | WORLD-01 |
 | `MONSTER_NOT_IN_ZONE` | 422 | Monstre inconnu ou absent de la zone du personnage | COMBAT-02 |
 | `CHARACTER_ALREADY_IN_COMBAT` | 409 | Le personnage a déjà un combat `IN_PROGRESS` | COMBAT-02 |

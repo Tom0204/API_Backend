@@ -3,7 +3,9 @@ import type { WorldRepository } from '../../domain/world/world-repository'
 import { Zone } from '../../domain/world/zone'
 import type { Prisma } from '../../generated/prisma/client'
 
-type MonsterRow = Prisma.MonsterTemplateGetPayload<object>
+const WITH_LOOT = { lootItem: { select: { id: true, code: true, name: true } } } as const
+
+type MonsterRow = Prisma.MonsterTemplateGetPayload<{ include: typeof WITH_LOOT }>
 
 export function createPrismaWorldRepository(tx: Prisma.TransactionClient): WorldRepository {
     return {
@@ -13,12 +15,12 @@ export function createPrismaWorldRepository(tx: Prisma.TransactionClient): World
         },
 
         async findMonstersByZone(zoneId) {
-            const rows = await tx.monsterTemplate.findMany({ where: { zoneId }, orderBy: [{ level: 'asc' }, { id: 'asc' }] })
+            const rows = await tx.monsterTemplate.findMany({ where: { zoneId }, orderBy: [{ level: 'asc' }, { id: 'asc' }], include: WITH_LOOT })
             return rows.map(toMonsterTemplate)
         },
 
         async findMonsterById(id) {
-            const row = await tx.monsterTemplate.findUnique({ where: { id } })
+            const row = await tx.monsterTemplate.findUnique({ where: { id }, include: WITH_LOOT })
             return row ? toMonsterTemplate(row) : undefined
         }
     }
@@ -35,6 +37,7 @@ function toMonsterTemplate(row: MonsterRow): MonsterTemplate {
         attack: row.attack,
         defense: row.defense,
         speed: row.speed,
-        xpReward: row.xpReward
+        xpReward: row.xpReward,
+        loot: row.lootItem && row.lootChance !== null ? { item: row.lootItem, chance: row.lootChance } : null
     })
 }

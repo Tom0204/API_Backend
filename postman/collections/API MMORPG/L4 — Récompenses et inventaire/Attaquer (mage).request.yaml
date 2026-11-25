@@ -1,0 +1,31 @@
+$kind: http-request
+url: "{{baseUrl}}/api/v1/combats/{{defeatCombatId}}/actions"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "type": "ATTACK"
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('200', () => pm.response.to.have.status(200));
+      const data = pm.response.json().data;
+      if (data.status === 'IN_PROGRESS') {
+          pm.execution.setNextRequest('Attaquer (mage)');
+      } else {
+          pm.test('DEFEAT : ni XP ni butin (rules.md §7)', () => {
+              pm.expect(data.status).to.eql('DEFEAT');
+              pm.expect(data.character.hp).to.eql(0);
+              pm.expect(data.rewards).to.eql(null);
+          });
+      }
+    language: text/javascript
+order: 6000

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "API MMORPG",
-    "description": "Parcours de l'API (Backlog.md §1), complété à chaque lot. L1 : santé, inscription, connexion, compte courant. L2 : classes, personnages, statistiques. L3 : monstres de la zone, combat jusqu’à la victoire. Lancer la collection dans l'ordre avec le Runner.",
+    "description": "Parcours de l'API (Backlog.md §1), complété à chaque lot. L1 : santé, inscription, connexion, compte courant. L2 : classes, personnages, statistiques. L3 : monstres de la zone, combat jusqu’à la victoire. L4 : récompenses (XP, butin aléatoire), inventaire, défaite. Lancer la collection dans l'ordre avec le Runner.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -51,6 +51,30 @@
     },
     {
       "key": "combatId",
+      "value": ""
+    },
+    {
+      "key": "mageClassId",
+      "value": ""
+    },
+    {
+      "key": "banditId",
+      "value": ""
+    },
+    {
+      "key": "lootItemCode",
+      "value": ""
+    },
+    {
+      "key": "mageName",
+      "value": ""
+    },
+    {
+      "key": "mageCharacterId",
+      "value": ""
+    },
+    {
+      "key": "defeatCombatId",
       "value": ""
     }
   ],
@@ -280,7 +304,8 @@
                   "    pm.response.to.have.status(200);",
                   "    pm.expect(pm.response.json().data.map(c => c.name)).to.eql(['Guerrier', 'Mage', 'Voleur']);",
                   "});",
-                  "pm.collectionVariables.set('classId', pm.response.json().data.find(c => c.code === 'warrior').id);"
+                  "pm.collectionVariables.set('classId', pm.response.json().data.find(c => c.code === 'warrior').id);",
+                  "pm.collectionVariables.set('mageClassId', pm.response.json().data.find(c => c.code === 'mage').id);"
                 ]
               }
             }
@@ -621,7 +646,8 @@
                   "    pm.response.to.have.status(200);",
                   "    pm.expect(pm.response.json().data.map(m => m.name)).to.eql(['Loup', 'Sanglier', 'Bandit']);",
                   "});",
-                  "pm.collectionVariables.set('monsterId', pm.response.json().data.find(m => m.code === 'wolf').id);"
+                  "pm.collectionVariables.set('monsterId', pm.response.json().data.find(m => m.code === 'wolf').id);",
+                  "pm.collectionVariables.set('banditId', pm.response.json().data.find(m => m.code === 'bandit').id);"
                 ]
               }
             }
@@ -742,8 +768,22 @@
               "script": {
                 "exec": [
                   "pm.test('200', () => pm.response.to.have.status(200));",
-                  "// Runner : rejoue cette requête tant que le combat est en cours.",
-                  "if (pm.response.json().data.status === 'IN_PROGRESS') pm.execution.setNextRequest('Attaquer');"
+                  "const data = pm.response.json().data;",
+                  "if (data.status === 'IN_PROGRESS') {",
+                  "    pm.test('rewards null tant que le combat continue', () => pm.expect(data.rewards).to.eql(null));",
+                  "    // Runner : rejoue cette requête tant que le combat est en cours.",
+                  "    pm.execution.setNextRequest('Attaquer');",
+                  "} else {",
+                  "    pm.test('VICTORY : 25 XP, niveau 1, butin éventuel (Peau de loup, quantité 1)', () => {",
+                  "        pm.expect(data.status).to.eql('VICTORY');",
+                  "        pm.expect(data.rewards.experienceGained).to.eql(25);",
+                  "        pm.expect(data.rewards.levelsGained).to.eql(0);",
+                  "        pm.expect(data.rewards.level).to.eql(1);",
+                  "        pm.expect(data.rewards.experience).to.eql(25);",
+                  "        if (data.rewards.item !== null) pm.expect(data.rewards.item).to.include({ code: 'wolf-pelt', quantity: 1 });",
+                  "    });",
+                  "    pm.collectionVariables.set('lootItemCode', data.rewards.item ? data.rewards.item.code : '');",
+                  "}"
                 ]
               }
             }
@@ -775,6 +815,7 @@
                   "    const data = pm.response.json().data;",
                   "    pm.expect(data.status).to.eql('VICTORY');",
                   "    pm.expect(data.character.hp).to.eql(92);",
+                  "    pm.expect(data.rewards).to.eql(null); // les récompenses ne sont renvoyées que par l'action finale",
                   "});"
                 ]
               }
@@ -875,6 +916,310 @@
                   "pm.test('PV de nouveau au maximum', () => {",
                   "    const stats = pm.response.json().data.stats;",
                   "    pm.expect(stats.currentHp).to.eql(stats.maxHp);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "L4 — Récompenses et inventaire",
+      "item": [
+        {
+          "name": "Personnage après la victoire",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/characters/{{characterId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, niveau 1 avec 25 XP (rules.md §8)', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data.level).to.eql(1);",
+                  "    pm.expect(data.experience).to.eql(25);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inventaire après la victoire",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/characters/{{characterId}}/inventory",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, contient le butin obtenu (ou vide sans butin)', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const data = pm.response.json().data;",
+                  "    const loot = pm.collectionVariables.get('lootItemCode');",
+                  "    if (loot) {",
+                  "        pm.expect(data).to.have.length(1);",
+                  "        pm.expect(data[0]).to.include({ code: loot, name: 'Peau de loup', quantity: 1 });",
+                  "    } else {",
+                  "        pm.expect(data).to.eql([]);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inventaire d'un autre joueur (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/characters/{{characterId}}/inventory",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{otherToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 CHARACTER_NOT_FOUND', () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('CHARACTER_NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Créer un mage",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/characters",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{mageName}}\",\n  \"classId\": \"{{mageClassId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const letters = 'abcdefghijklmnopqrstuvwxyz';",
+                  "let suffix = '';",
+                  "for (let i = 0; i < 8; i++) suffix += letters[Math.floor(Math.random() * letters.length)];",
+                  "pm.collectionVariables.set('mageName', 'Mage' + suffix);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201, mage niveau 1', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('mageCharacterId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Démarrer un combat : mage contre bandit",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/combats",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"characterId\": \"{{mageCharacterId}}\",\n  \"monsterId\": \"{{banditId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201, le bandit (plus rapide) a joué son premier tour', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "    pm.expect(pm.response.json().data.lastTurn.monsterDamage).to.eql(11);",
+                  "});",
+                  "pm.collectionVariables.set('defeatCombatId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attaquer (mage)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/combats/{{defeatCombatId}}/actions",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"ATTACK\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "if (data.status === 'IN_PROGRESS') {",
+                  "    pm.execution.setNextRequest('Attaquer (mage)');",
+                  "} else {",
+                  "    pm.test('DEFEAT : ni XP ni butin (rules.md §7)', () => {",
+                  "        pm.expect(data.status).to.eql('DEFEAT');",
+                  "        pm.expect(data.character.hp).to.eql(0);",
+                  "        pm.expect(data.rewards).to.eql(null);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mage après la défaite",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/characters/{{mageCharacterId}}/stats",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, niveau 1, 0 XP, PV de nouveau au maximum', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data.level).to.eql(1);",
+                  "    pm.expect(data.experience).to.eql(0);",
+                  "    pm.expect(data.stats.currentHp).to.eql(data.stats.maxHp);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inventaire du mage (vide)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/characters/{{mageCharacterId}}/inventory",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, inventaire vide', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().data).to.eql([]);",
                   "});"
                 ]
               }

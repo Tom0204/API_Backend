@@ -1,0 +1,23 @@
+$kind: http-request
+url: "{{baseUrl}}/api/v1/characters/{{characterId}}/inventory"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('200, contient le butin obtenu (ou vide sans butin)', () => {
+          pm.response.to.have.status(200);
+          const data = pm.response.json().data;
+          const loot = pm.collectionVariables.get('lootItemCode');
+          if (loot) {
+              pm.expect(data).to.have.length(1);
+              pm.expect(data[0]).to.include({ code: loot, name: 'Peau de loup', quantity: 1 });
+          } else {
+              pm.expect(data).to.eql([]);
+          }
+      });
+    language: text/javascript
+order: 2000

@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{baseUrl}}/api/v1/characters/{{characterId}}/stats"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('PV de nouveau au maximum', () => {
+          const stats = pm.response.json().data.stats;
+          pm.expect(stats.currentHp).to.eql(stats.maxHp);
+      });
+    language: text/javascript
+order: 9000

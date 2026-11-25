@@ -1,4 +1,4 @@
-// Schéma initial (ARCH-03), combats (L3). L'inventaire (L4) sera ajouté par migration (adaptation L1 E1).
+// Schéma initial (ARCH-03), combats (L3), inventaire (L4).
 // Identifiants UUID v7 générés par PostgreSQL 18. Contraintes CHECK : ajoutées en SQL dans la migration.
 
 generator client {
@@ -75,25 +75,26 @@ model Item {
   code     String            @unique @db.VarChar(32)
   name     String            @db.VarChar(64)
   droppers MonsterTemplate[]
+  stacks   InventoryItem[]
 
   @@map("items")
 }
 
 /// Modèle de monstre (rules.md §8) : chaque combat en crée sa propre instance.
 model MonsterTemplate {
-  id         String  @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  code       String  @unique @db.VarChar(32)
-  zoneId     String  @map("zone_id") @db.Uuid
-  name       String  @db.VarChar(64)
+  id         String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  code       String   @unique @db.VarChar(32)
+  zoneId     String   @map("zone_id") @db.Uuid
+  name       String   @db.VarChar(64)
   level      Int
   hp         Int
   attack     Int
   defense    Int
   speed      Int
-  xpReward   Int     @map("xp_reward")
-  lootItemId String? @map("loot_item_id") @db.Uuid
+  xpReward   Int      @map("xp_reward")
+  lootItemId String?  @map("loot_item_id") @db.Uuid
   /// Probabilité p du butin, dans [0, 1] ; nulle si le monstre n'a pas de butin.
-  lootChance Float?  @map("loot_chance")
+  lootChance Float?   @map("loot_chance")
   zone       Zone     @relation(fields: [zoneId], references: [id], onDelete: Restrict)
   lootItem   Item?    @relation(fields: [lootItemId], references: [id], onDelete: Restrict)
   combats    Combat[]
@@ -104,19 +105,20 @@ model MonsterTemplate {
 
 /// Niveau et XP dans le niveau courant (rules.md §5) ; les statistiques ne sont jamais stockées.
 model Character {
-  id         String         @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  accountId  String         @map("account_id") @db.Uuid
-  classId    String         @map("class_id") @db.Uuid
-  zoneId     String         @map("zone_id") @db.Uuid
+  id         String          @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  accountId  String          @map("account_id") @db.Uuid
+  classId    String          @map("class_id") @db.Uuid
+  zoneId     String          @map("zone_id") @db.Uuid
   /// Unicité sans tenir compte de la casse : index unique sur lower(name), ajouté en SQL.
-  name       String         @db.VarChar(16)
-  level      Int            @default(1)
-  experience Int            @default(0)
-  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  account    Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  class      CharacterClass @relation(fields: [classId], references: [id], onDelete: Restrict)
-  zone       Zone           @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  name       String          @db.VarChar(16)
+  level      Int             @default(1)
+  experience Int             @default(0)
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  account    Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  class      CharacterClass  @relation(fields: [classId], references: [id], onDelete: Restrict)
+  zone       Zone            @relation(fields: [zoneId], references: [id], onDelete: Restrict)
   combats    Combat[]
+  inventory  InventoryItem[]
 
   @@index([accountId])
   @@map("characters")
@@ -154,4 +156,17 @@ model Combat {
 
   @@index([characterId])
   @@map("combats")
+}
+
+/// Pile d'objets de l'inventaire d'un personnage (rules.md §10, L4 D1) : aucune ligne = inventaire vide.
+/// Quantité > 0 : contrainte CHECK ajoutée en SQL.
+model InventoryItem {
+  characterId String    @map("character_id") @db.Uuid
+  itemId      String    @map("item_id") @db.Uuid
+  quantity    Int
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  item        Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@id([characterId, itemId])
+  @@map("inventory_items")
 }

@@ -28,5 +28,8 @@ export const XP_CURVE_EXPONENT = 1.5
 export const DEFENSE_CONSTANT = 100
 export const MIN_DAMAGE = 1
 
+/** rules.md §7 : au plus un objet de butin par victoire, en quantité 1. */
+export const LOOT_QUANTITY = 1
+
 /** rules.md §8 : code de la zone de départ dans les données de référence. */
 export const STARTING_ZONE_CODE = 'clearing'

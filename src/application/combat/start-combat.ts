@@ -4,6 +4,7 @@ import { Combat, type TurnResult } from '../../domain/combat/combat'
 import { combatErrors } from '../../domain/combat/combat-errors'
 import type { Clock } from '../ports/clock'
 import type { UnitOfWork } from '../ports/unit-of-work'
+import type { VictoryRewards } from './grant-victory-rewards'
 
 export interface StartCombatCommand {
     accountId: string // tiré du jeton
@@ -15,6 +16,8 @@ export interface CombatTurnView {
     combat: Combat
     /** Dégâts de la requête ; `null` si personne n'a encore joué. */
     lastTurn: TurnResult | null
+    /** Récompenses de la victoire ; `null` hors de l'action finale victorieuse (L4 D2). */
+    rewards: VictoryRewards | null
 }
 
 export function createStartCombat({ unitOfWork, clock }: { unitOfWork: UnitOfWork; clock: Clock }) {
@@ -43,7 +46,7 @@ export function createStartCombat({ unitOfWork, clock }: { unitOfWork: UnitOfWor
                     monster: monster.combatStats,
                     now: clock.now()
                 })
-                return { combat: await combats.insert(combat), lastTurn: openingTurn }
+                return { combat: await combats.insert(combat), lastTurn: openingTurn, rewards: null }
             })
     }
 }

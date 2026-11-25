@@ -8,6 +8,7 @@ import type { Authenticate } from '../../application/identity/authenticate'
 import type { GetCurrentAccount } from '../../application/identity/get-current-account'
 import type { Login } from '../../application/identity/login'
 import type { RegisterAccount } from '../../application/identity/register-account'
+import type { GetMyInventory } from '../../application/inventory/get-my-inventory'
 import type { ListZoneMonsters } from '../../application/world/list-zone-monsters'
 import type { CharacterUseCases } from './characters/character.controller'
 import { createCharacterRoutes } from './characters/character.routes'
@@ -15,6 +16,7 @@ import { createClassRoutes } from './characters/class.routes'
 import { type CombatUseCases, createCombatRoutes } from './combat/combat.routes'
 import { createHealthRoutes } from './health/health.routes'
 import { createAuthRoutes } from './identity/auth.routes'
+import { createInventoryRoutes } from './inventory/inventory.routes'
 import { requireJsonContentType } from './middlewares/content-type'
 import { errorHandler } from './middlewares/error-handler'
 import { notFound } from './middlewares/not-found'
@@ -32,6 +34,7 @@ export interface UseCases extends CharacterUseCases, CombatUseCases {
     getCurrentAccount: GetCurrentAccount
     listClasses: ListClasses
     listZoneMonsters: ListZoneMonsters
+    getMyInventory: GetMyInventory
 }
 
 export interface AppOptions {
@@ -72,6 +75,7 @@ export function createApp(useCases: UseCases, options: AppOptions): Express {
     app.use(createCharacterRoutes({ ...useCases, requireAuth }))
     app.use(createWorldRoutes({ ...useCases, requireAuth }))
     app.use(createCombatRoutes({ ...useCases, requireAuth }))
+    app.use(createInventoryRoutes({ ...useCases, requireAuth }))
 
     app.use(notFound)
     app.use(errorHandler)

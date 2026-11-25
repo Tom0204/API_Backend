@@ -1,0 +1,27 @@
+$kind: http-request
+name: "Démarrer un combat : mage contre bandit"
+url: "{{baseUrl}}/api/v1/combats"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "characterId": "{{mageCharacterId}}",
+      "monsterId": "{{banditId}}"
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('201, le bandit (plus rapide) a joué son premier tour', () => {
+          pm.response.to.have.status(201);
+          pm.expect(pm.response.json().data.lastTurn.monsterDamage).to.eql(11);
+      });
+      pm.collectionVariables.set('defeatCombatId', pm.response.json().data.id);
+    language: text/javascript
+order: 5000

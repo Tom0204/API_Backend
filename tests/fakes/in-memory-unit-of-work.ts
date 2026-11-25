@@ -14,6 +14,9 @@ import { Email } from '../../src/domain/identity/email'
 import { identityErrors } from '../../src/domain/identity/identity-errors'
 import { Session } from '../../src/domain/identity/session'
 import type { SessionRepository } from '../../src/domain/identity/session-repository'
+import { Inventory } from '../../src/domain/inventory/inventory'
+import type { InventoryRepository } from '../../src/domain/inventory/inventory-repository'
+import { ItemStack } from '../../src/domain/inventory/item-stack'
 import { Combat, type CombatStatus } from '../../src/domain/combat/combat'
 import { combatErrors } from '../../src/domain/combat/combat-errors'
 import type { CombatRepository } from '../../src/domain/combat/combat-repository'
@@ -22,7 +25,7 @@ import { STARTING_ZONE_CODE } from '../../src/domain/shared/game-rules'
 import { MonsterTemplate, type MonsterTemplateProps } from '../../src/domain/world/monster-template'
 import type { WorldRepository } from '../../src/domain/world/world-repository'
 import { Zone, type ZoneProps } from '../../src/domain/world/zone'
-import { CHARACTER_CLASSES, MONSTER_TEMPLATES, ZONES } from '../../src/infrastructure/prisma/seed-reference-data'
+import { CHARACTER_CLASSES, ITEMS, MONSTER_TEMPLATES, ZONES } from '../../src/infrastructure/prisma/seed-reference-data'
 
 interface AccountRecord {
     id: string
@@ -59,6 +62,18 @@ interface CharacterRecord {
 
 type MonsterRecord = MonsterTemplateProps
 
+interface ItemRecord {
+    id: string
+    code: string
+    name: string
+}
+
+interface InventoryItemRecord {
+    characterId: string
+    itemId: string
+    quantity: number
+}
+
 interface CombatRecord {
     id: string
     characterId: string
@@ -76,8 +91,10 @@ export interface InMemoryState {
     classes: CharacterClassRecord[]
     characters: CharacterRecord[]
     zones: ZoneProps[]
+    items: ItemRecord[]
     monsters: MonsterRecord[]
     combats: CombatRecord[]
+    inventoryItems: InventoryItemRecord[]
 }
 
 /** Zone de départ des tests sans base (équivalent de la Clairière du seed). */
@@ -90,11 +107,12 @@ function seedZones(): ZoneProps[] {
     }))
 }
 
-function seedMonsters(zones: ZoneProps[]): MonsterRecord[] {
-    return MONSTER_TEMPLATES.map(({ zoneCode, loot: _loot, ...monster }) => {
+function seedMonsters(zones: ZoneProps[], items: ItemRecord[]): MonsterRecord[] {
+    return MONSTER_TEMPLATES.map(({ zoneCode, loot, ...monster }) => {
         const zone = zones.find((candidate) => candidate.code === zoneCode)
-        if (!zone) throw new Error(`Zone inconnue : ${zoneCode}`)
-        return { ...monster, id: randomUUID(), zoneId: zone.id }
+        const item = items.find((candidate) => candidate.code === loot.itemCode)
+        if (!zone || !item) throw new Error(`Donnée de référence inconnue : ${monster.code}`)
+        return { ...monster, id: randomUUID(), zoneId: zone.id, loot: { item: { ...item }, chance: loot.chance } }
     })
 }
 
@@ -117,8 +135,10 @@ export class InMemoryDatabase implements UnitOfWork {
         })),
         characters: [],
         zones: [],
+        items: ITEMS.map((item) => ({ id: randomUUID(), code: item.code, name: item.name })),
         monsters: [],
-        combats: []
+        combats: [],
+        inventoryItems: []
     }
     private queue: Promise<unknown> = Promise.resolve()
 
@@ -135,7 +155,7 @@ export class InMemoryDatabase implements UnitOfWork {
 
     constructor() {
         this.state.zones = seedZones()
-        this.state.monsters = seedMonsters(this.state.zones)
+        this.state.monsters = seedMonsters(this.state.zones, this.state.items)
     }
 
     /** Identifiant d'un monstre du seed, par son code (`wolf`, `boar`, `bandit`). */
@@ -143,6 +163,13 @@ export class InMemoryDatabase implements UnitOfWork {
         const found = this.state.monsters.find((monster) => monster.code === code)
         if (!found) throw new Error(`Monstre inconnu : ${code}`)
         return found.id
+    }
+
+    /** Objet du seed, par son code (`wolf-pelt`, `boar-tusk`, `bandit-badge`). */
+    item(code: string): ItemRecord {
+        const found = this.state.items.find((item) => item.code === code)
+        if (!found) throw new Error(`Objet inconnu : ${code}`)
+        return { ...found }
     }
 
     /** Identifiant d'une classe du seed, par son code (`warrior`, `mage`, `rogue`). */
@@ -160,7 +187,8 @@ function createRepositories(draft: InMemoryState): Repositories {
         characters: createCharacterRepository(draft),
         classes: createCharacterClassRepository(draft),
         world: createWorldRepository(draft),
-        combats: createCombatRepository(draft)
+        combats: createCombatRepository(draft),
+        inventories: createInventoryRepository(draft)
     }
 }
 
@@ -174,10 +202,10 @@ function createWorldRepository(draft: InMemoryState): WorldRepository {
             draft.monsters
                 .filter((record) => record.zoneId === zoneId)
                 .sort((a, b) => a.level - b.level)
-                .map((record) => MonsterTemplate.restore({ ...record })),
+                .map((record) => MonsterTemplate.restore(structuredClone(record))),
         findMonsterById: async (id) => {
             const monster = draft.monsters.find((record) => record.id === id)
-            return monster ? MonsterTemplate.restore({ ...monster }) : undefined
+            return monster ? MonsterTemplate.restore(structuredClone(monster)) : undefined
         }
     }
 }
@@ -245,6 +273,38 @@ function createCombatRepository(draft: InMemoryState): CombatRepository {
                 character: { ...record.character, hp: character.hp },
                 monster: { ...record.monster, hp: monster.hp }
             })
+        }
+    }
+}
+
+function createInventoryRepository(draft: InMemoryState): InventoryRepository {
+    return {
+        findByCharacter: async (characterId) =>
+            Inventory.restore(
+                characterId,
+                draft.inventoryItems
+                    .filter((record) => record.characterId === characterId)
+                    .map((record) => {
+                        const item = draft.items.find((candidate) => candidate.id === record.itemId)
+                        if (!item) throw new Error('Clé étrangère violée : objet inexistant')
+                        return ItemStack.of({ ...item }, record.quantity)
+                    })
+            ),
+        // Équivalent de INSERT … ON CONFLICT DO UPDATE SET quantity = quantity + EXCLUDED.quantity (L4 D1).
+        save: async (inventory) => {
+            if (!draft.characters.some((record) => record.id === inventory.characterId)) {
+                throw new Error('Clé étrangère violée : personnage inexistant')
+            }
+            for (const added of inventory.pendingAdditions) {
+                if (!draft.items.some((item) => item.id === added.item.id)) {
+                    throw new Error('Clé étrangère violée : objet inexistant')
+                }
+                const record = draft.inventoryItems.find(
+                    (candidate) => candidate.characterId === inventory.characterId && candidate.itemId === added.item.id
+                )
+                if (record) record.quantity += added.quantity
+                else draft.inventoryItems.push({ characterId: inventory.characterId, itemId: added.item.id, quantity: added.quantity })
+            }
         }
     }
 }
@@ -333,6 +393,12 @@ function createCharacterRepository(draft: InMemoryState): CharacterRepository {
             }
             draft.characters.push(record)
             return restoreCharacter(record)
+        },
+        save: async (character) => {
+            const { id, progression } = character.snapshot
+            const record = draft.characters.find((candidate) => candidate.id === id)
+            if (!record) throw new Error('Personnage inexistant')
+            Object.assign(record, { level: progression.level, experience: progression.experience })
         }
     }
 }

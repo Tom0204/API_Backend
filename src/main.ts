@@ -12,6 +12,7 @@ import { createAuthenticate } from './application/identity/authenticate'
 import { createGetCurrentAccount } from './application/identity/get-current-account'
 import { createLogin } from './application/identity/login'
 import { createRegisterAccount } from './application/identity/register-account'
+import { createGetMyInventory } from './application/inventory/get-my-inventory'
 import { loadEnvironment } from './config/environment'
 import { createLogger } from './infrastructure/logging/logger'
 import { createPrismaClient } from './infrastructure/prisma/client'
@@ -19,6 +20,7 @@ import { findStartingZoneId } from './infrastructure/prisma/find-starting-zone-i
 import { createPrismaUnitOfWork } from './infrastructure/prisma/prisma-unit-of-work'
 import { createArgon2PasswordHasher } from './infrastructure/security/argon2-password-hasher'
 import { createCryptoTokenGenerator } from './infrastructure/security/crypto-token-generator'
+import { createCryptoRandomSource } from './infrastructure/system/crypto-random-source'
 import { createSystemClock } from './infrastructure/system/system-clock'
 import { createApp } from './interfaces/http/app'
 
@@ -32,6 +34,7 @@ async function main(): Promise<void> {
     const passwordHasher = createArgon2PasswordHasher()
     const tokenGenerator = createCryptoTokenGenerator()
     const clock = createSystemClock()
+    const random = createCryptoRandomSource()
 
     let startingZoneId: string
     try {
@@ -56,8 +59,9 @@ async function main(): Promise<void> {
             getCharacterStats: createGetCharacterStats({ unitOfWork }),
             listZoneMonsters: createListZoneMonsters({ unitOfWork }),
             startCombat: createStartCombat({ unitOfWork, clock }),
-            playCombatAction: createPlayCombatAction({ unitOfWork, clock }),
-            getMyCombat: createGetMyCombat({ unitOfWork })
+            playCombatAction: createPlayCombatAction({ unitOfWork, clock, random }),
+            getMyCombat: createGetMyCombat({ unitOfWork }),
+            getMyInventory: createGetMyInventory({ unitOfWork })
         },
         { logger, corsOrigins: env.CORS_ORIGINS }
     )

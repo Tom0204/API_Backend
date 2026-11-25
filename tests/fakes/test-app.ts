@@ -14,8 +14,9 @@ import { createAuthenticate } from '../../src/application/identity/authenticate'
 import { createGetCurrentAccount } from '../../src/application/identity/get-current-account'
 import { createLogin } from '../../src/application/identity/login'
 import { createRegisterAccount } from '../../src/application/identity/register-account'
+import { createGetMyInventory } from '../../src/application/inventory/get-my-inventory'
 import { type AppOptions, createApp } from '../../src/interfaces/http/app'
-import { FakePasswordHasher, FakeTokenGenerator, FixedClock } from './fake-ports'
+import { FakePasswordHasher, FakeTokenGenerator, FixedClock, FixedRandom } from './fake-ports'
 import { IN_MEMORY_STARTING_ZONE_ID, InMemoryDatabase } from './in-memory-unit-of-work'
 
 /** Application HTTP complète sur les faux : jamais `main.ts`, jamais de base. */
@@ -24,6 +25,7 @@ export function buildTestApp(overrides: Partial<Omit<AppOptions, 'logger'>> = {}
     const passwordHasher = new FakePasswordHasher()
     const tokenGenerator = new FakeTokenGenerator()
     const clock = new FixedClock()
+    const random = new FixedRandom() // 0,9 par défaut : aucun butin ; modifiable par les tests
 
     const logLines: string[] = []
     const logger = pino(
@@ -36,7 +38,7 @@ export function buildTestApp(overrides: Partial<Omit<AppOptions, 'logger'>> = {}
         })
     )
 
-    const deps = { unitOfWork: database, passwordHasher, tokenGenerator, clock }
+    const deps = { unitOfWork: database, passwordHasher, tokenGenerator, clock, random }
     const app = createApp(
         {
             checkHealth: createCheckHealth(),
@@ -52,12 +54,13 @@ export function buildTestApp(overrides: Partial<Omit<AppOptions, 'logger'>> = {}
             listZoneMonsters: createListZoneMonsters(deps),
             startCombat: createStartCombat(deps),
             playCombatAction: createPlayCombatAction(deps),
-            getMyCombat: createGetMyCombat(deps)
+            getMyCombat: createGetMyCombat(deps),
+            getMyInventory: createGetMyInventory(deps)
         },
         { logger, corsOrigins: [], ...overrides }
     )
 
-    return { app, database, passwordHasher, tokenGenerator, clock, logLines }
+    return { app, database, passwordHasher, tokenGenerator, clock, random, logLines }
 }
 
 export const VALID_PASSWORD = 'correct-horse-battery-staple'

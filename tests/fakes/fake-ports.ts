@@ -1,5 +1,6 @@
 import type { Clock } from '../../src/application/ports/clock'
 import type { PasswordHasher } from '../../src/application/ports/password-hasher'
+import type { RandomSource } from '../../src/application/ports/random-source'
 import type { TokenGenerator } from '../../src/application/ports/token-generator'
 
 /** Hachage instantané et lisible, qui compte les vérifications (égalisation des délais, D7). */
@@ -27,6 +28,18 @@ export class FakeTokenGenerator implements TokenGenerator {
 
     hash(token: string): string {
         return `sha256(${token})`
+    }
+}
+
+/** Tirage forcé (rules.md §7 : 0,31 → objet du loup, 0,9 → rien) ; compte les tirages. */
+export class FixedRandom implements RandomSource {
+    draws = 0
+
+    constructor(public value = 0.9) {}
+
+    next(): number {
+        this.draws += 1
+        return this.value
     }
 }
 

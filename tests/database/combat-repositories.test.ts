@@ -7,6 +7,7 @@ import type { PrismaClient } from '../../src/infrastructure/prisma/client'
 import { findStartingZoneId } from '../../src/infrastructure/prisma/find-starting-zone-id'
 import { createPrismaUnitOfWork } from '../../src/infrastructure/prisma/prisma-unit-of-work'
 import { seedReferenceData } from '../../src/infrastructure/prisma/seed-reference-data'
+import { createCryptoRandomSource } from '../../src/infrastructure/system/crypto-random-source'
 import { createSystemClock } from '../../src/infrastructure/system/system-clock'
 import { uniqueCharacterName } from '../contracts/character-repositories.contract'
 import { type CombatContractContext, describeCombatRepositoryContract } from '../contracts/combat-repositories.contract'
@@ -50,7 +51,7 @@ afterAll(async () => {
 describeCombatRepositoryContract('Prisma', () => context)
 
 describe('combat sur PostgreSQL (concurrence)', () => {
-    const deps = () => ({ unitOfWork: context.unitOfWork, clock: createSystemClock() })
+    const deps = () => ({ unitOfWork: context.unitOfWork, clock: createSystemClock(), random: createCryptoRandomSource() })
 
     it('2 démarrages simultanés pour le même personnage → 1 seul combat', async () => {
         const player = await createPlayer()

@@ -8,13 +8,14 @@ import { createStartCombat } from '../../../../src/application/combat/start-comb
 import { createListZoneMonsters } from '../../../../src/application/world/list-zone-monsters'
 import { Account } from '../../../../src/domain/identity/account'
 import { Email } from '../../../../src/domain/identity/email'
-import { FixedClock } from '../../../fakes/fake-ports'
+import { FixedClock, FixedRandom } from '../../../fakes/fake-ports'
 import { IN_MEMORY_STARTING_ZONE_ID, InMemoryDatabase } from '../../../fakes/in-memory-unit-of-work'
 
 function setup() {
     const database = new InMemoryDatabase()
     const clock = new FixedClock()
-    const deps = { unitOfWork: database, clock }
+    const random = new FixedRandom()
+    const deps = { unitOfWork: database, clock, random }
     const createCharacter = createCreateCharacter({ unitOfWork: database, startingZoneId: IN_MEMORY_STARTING_ZONE_ID })
     const newPlayer = async (classCode = 'warrior') => {
         const accountId = (
@@ -33,6 +34,7 @@ function setup() {
     return {
         database,
         clock,
+        random,
         newPlayer,
         listZoneMonsters: createListZoneMonsters(deps),
         startCombat: createStartCombat(deps),

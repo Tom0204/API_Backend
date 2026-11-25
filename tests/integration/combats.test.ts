@@ -72,6 +72,7 @@ describe('POST /api/v1/combats', () => {
                 character: { hp: 113, maxHp: 120, attack: 12, defense: 8, speed: 8 },
                 monster: { name: 'Loup', hp: 40, maxHp: 40, attack: 8, defense: 2, speed: 9 },
                 lastTurn: { characterDamage: null, monsterDamage: 7 },
+                rewards: null,
                 createdAt: expect.any(String),
                 finishedAt: null
             }

@@ -59,6 +59,11 @@ export function createPrismaCharacterRepository(tx: Prisma.TransactionClient): C
                 if (isUniqueViolation(error)) throw characterErrors.nameTaken()
                 throw error
             }
+        },
+
+        async save(character) {
+            const { id, progression } = character.snapshot
+            await tx.character.update({ where: { id }, data: { level: progression.level, experience: progression.experience } })
         }
     }
 }

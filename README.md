@@ -20,7 +20,18 @@ npm run db:seed               # données de référence (idempotent)
 npm run dev
 ```
 
-Vérification : `GET http://localhost:4001/health` → `200`. Parcours complet : collection Postman `postman/`.
+Vérification : `GET http://localhost:4001/health` → `200`.
+
+## Parcours avec Postman
+
+Importer `postman/mmorpg-api.postman_collection.json`, puis lancer la collection entière avec le **Runner**, dans l'ordre :
+inscription → connexion → personnage → statistiques → monstres de la zone → combat contre le loup jusqu'à la victoire
+(25 XP, butin aléatoire) → inventaire → mage contre le bandit jusqu'à la défaite (ni XP ni butin).
+Les emails et noms sont générés à chaque exécution : aucune remise à zéro de la base n'est nécessaire.
+
+- Variable `baseUrl` : `http://localhost:4001` par défaut.
+- L'inscription et la connexion sont limitées chacune à 10 requêtes par 15 minutes et par IP (`docs/conventions.md` §7) :
+  une exécution complète en consomme 3 de chaque, la quatrième exécution en 15 minutes reçoit donc `429`.
 
 ## Commandes
 
@@ -39,8 +50,25 @@ Vérification : `GET http://localhost:4001/health` → `200`. Parcours complet :
 
 ## Architecture
 
-Clean Architecture en quatre couches (`domain`, `application`, `infrastructure`, `interfaces/http`) et cinq contextes
-(`identity`, `characters`, `world`, `combat`, `inventory`). Détail : `docs/architecture.md`.
+Clean Architecture et DDD. Détail et exemple de référence : `docs/architecture.md`.
+
+| Couche | Contient | Dépend de |
+|---|---|---|
+| `src/domain/` | Agrégats, objets-valeurs, règles de jeu, erreurs métier, interfaces des repositories | rien |
+| `src/application/` | Un cas d'usage par action ; ports `UnitOfWork`, `Clock`, `RandomSource`, `PasswordHasher`, `TokenGenerator` | `domain` |
+| `src/infrastructure/` | Prisma (repositories, transactions), Argon2, horloge, aléatoire, logs | `domain`, `application` |
+| `src/interfaces/http/` | Routes Express, schémas Zod, présentateurs, middlewares | `application` |
+| `src/main.ts` | Composition : construit l'infrastructure et l'injecte | tout |
+
+La règle de dépendance est vérifiée par `tests/architecture.test.ts`.
+
+| Contexte | Rôle |
+|---|---|
+| `identity` | Comptes, sessions opaques de 24 h, authentification |
+| `characters` | Classes, personnages, statistiques calculées, progression (XP, niveaux) |
+| `world` | Zones et modèles de monstres, avec leur butin |
+| `combat` | Combat tour par tour, récompenses de victoire (XP et butin dans une seule transaction) |
+| `inventory` | Inventaire d'un personnage, objets empilés par type |
 
 ## Variables d'environnement
 

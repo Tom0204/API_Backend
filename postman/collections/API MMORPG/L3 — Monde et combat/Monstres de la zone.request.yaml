@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{baseUrl}}/api/v1/zones/{{zoneId}}/monsters"
+method: GET
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('200, Loup / Sanglier / Bandit', () => {
+          pm.response.to.have.status(200);
+          pm.expect(pm.response.json().data.map(m => m.name)).to.eql(['Loup', 'Sanglier', 'Bandit']);
+      });
+      pm.collectionVariables.set('monsterId', pm.response.json().data.find(m => m.code === 'wolf').id);
+      pm.collectionVariables.set('banditId', pm.response.json().data.find(m => m.code === 'bandit').id);
+    language: text/javascript
+order: 2000

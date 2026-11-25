@@ -37,6 +37,8 @@ export function describeCombatRepositoryContract(name: string, getContext: () =>
             expect(zone?.snapshot).toMatchObject({ code: 'clearing', name: 'Clairière', minLevel: 1, maxLevel: 3 })
             expect(monsters.map((m) => m.snapshot.code)).toEqual(['wolf', 'boar', 'bandit'])
             expect(wolf?.combatStats).toEqual(WOLF)
+            expect(wolf?.snapshot.loot).toEqual({ item: { id: expect.any(String), code: 'wolf-pelt', name: 'Peau de loup' }, chance: 0.5 })
+            expect(monsters.map((m) => m.snapshot.loot?.item.code)).toEqual(['wolf-pelt', 'boar-tusk', 'bandit-badge'])
             expect(await ctx.unitOfWork.run(({ world }) => world.findZoneById(randomUUID()))).toBeUndefined()
             expect(await ctx.unitOfWork.run(({ world }) => world.findMonstersByZone(randomUUID()))).toEqual([])
             expect(await ctx.unitOfWork.run(({ world }) => world.findMonsterById(randomUUID()))).toBeUndefined()

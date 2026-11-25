@@ -1,0 +1,30 @@
+$kind: http-request
+url: "{{baseUrl}}/api/v1/characters"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "name": "{{mageName}}",
+      "classId": "{{mageClassId}}"
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: beforeRequest
+    code: |-
+      const letters = 'abcdefghijklmnopqrstuvwxyz';
+      let suffix = '';
+      for (let i = 0; i < 8; i++) suffix += letters[Math.floor(Math.random() * letters.length)];
+      pm.collectionVariables.set('mageName', 'Mage' + suffix);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test('201, mage niveau 1', () => pm.response.to.have.status(201));
+      pm.collectionVariables.set('mageCharacterId', pm.response.json().data.id);
+    language: text/javascript
+order: 4000
