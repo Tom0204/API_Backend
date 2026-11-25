@@ -1,6 +1,8 @@
 import type { UnitOfWork } from '../../application/ports/unit-of-work'
 import type { PrismaClient } from '../../generated/prisma/client'
 import { createPrismaAccountRepository } from './prisma-account-repository'
+import { createPrismaCharacterClassRepository } from './prisma-character-class-repository'
+import { createPrismaCharacterRepository } from './prisma-character-repository'
 import { createPrismaSessionRepository } from './prisma-session-repository'
 
 /** Une transaction PostgreSQL par appel : validée si `work` réussit, annulée si `work` lève une erreur. */
@@ -10,7 +12,9 @@ export function createPrismaUnitOfWork(prisma: PrismaClient): UnitOfWork {
             prisma.$transaction((tx) =>
                 work({
                     accounts: createPrismaAccountRepository(tx),
-                    sessions: createPrismaSessionRepository(tx)
+                    sessions: createPrismaSessionRepository(tx),
+                    characters: createPrismaCharacterRepository(tx),
+                    classes: createPrismaCharacterClassRepository(tx)
                 })
             )
     }

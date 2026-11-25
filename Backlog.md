@@ -17,8 +17,8 @@ Hors projet : voir `docs/rules.md` §1.
 
 | Jour | Lot | Tickets | Résultat en fin de journée | Statut | Commit |
 |---|---|---|---|---|---|
-| 1 | L1 Socle et identité | ARCH-01 à ARCH-04, ID-01 à ID-03 | Structure en couches validée, base prête, inscription et connexion | ✅ | — |
-| 2 | L2 Personnages | CHAR-01 à CHAR-04 | Créer et consulter ses personnages, statistiques et progression | ⏳ | — |
+| 1 | L1 Socle et identité | ARCH-01 à ARCH-04, ID-01 à ID-03 | Structure en couches validée, base prête, inscription et connexion | ✅ | a4deeb2 |
+| 2 | L2 Personnages | CHAR-01 à CHAR-04 | Créer et consulter ses personnages, statistiques et progression | ✅ | — |
 | 3 | L3 Monde et combat | WORLD-01, COMBAT-01 à COMBAT-03 | Combat jouable jusqu'à la victoire ou la défaite | ⏳ | — |
 | 4 | L4 Récompenses et livraison | REWARD-01, INV-01, DOC-01, QUAL-01 | Parcours complet, collection Postman, README | ⏳ | — |
 

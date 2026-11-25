@@ -2,11 +2,15 @@ import cors from 'cors'
 import express, { type Express } from 'express'
 import helmet from 'helmet'
 import type { Logger } from 'pino'
+import type { ListClasses } from '../../application/characters/list-classes'
 import type { CheckHealth } from '../../application/health/check-health'
 import type { Authenticate } from '../../application/identity/authenticate'
 import type { GetCurrentAccount } from '../../application/identity/get-current-account'
 import type { Login } from '../../application/identity/login'
 import type { RegisterAccount } from '../../application/identity/register-account'
+import type { CharacterUseCases } from './characters/character.controller'
+import { createCharacterRoutes } from './characters/character.routes'
+import { createClassRoutes } from './characters/class.routes'
 import { createHealthRoutes } from './health/health.routes'
 import { createAuthRoutes } from './identity/auth.routes'
 import { requireJsonContentType } from './middlewares/content-type'
@@ -17,12 +21,13 @@ import { createRequestLogger } from './middlewares/request-logger'
 import { createRequireAuth } from './middlewares/require-auth'
 
 /** Un cas d'usage par route ; construits par `main.ts`, ou sur `tests/fakes/` dans les tests HTTP. */
-export interface UseCases {
+export interface UseCases extends CharacterUseCases {
     checkHealth: CheckHealth
     registerAccount: RegisterAccount
     login: Login
     authenticate: Authenticate
     getCurrentAccount: GetCurrentAccount
+    listClasses: ListClasses
 }
 
 export interface AppOptions {
@@ -51,13 +56,16 @@ export function createApp(useCases: UseCases, options: AppOptions): Express {
     app.use(requireJsonContentType)
     app.use(express.json({ limit: JSON_BODY_LIMIT }))
 
+    const requireAuth = createRequireAuth(useCases.authenticate)
     app.use(
         createAuthRoutes({
             ...useCases,
-            requireAuth: createRequireAuth(useCases.authenticate),
+            requireAuth,
             createAuthRateLimiter: () => createRateLimiter(rateLimits.auth)
         })
     )
+    app.use(createClassRoutes(useCases))
+    app.use(createCharacterRoutes({ ...useCases, requireAuth }))
 
     app.use(notFound)
     app.use(errorHandler)

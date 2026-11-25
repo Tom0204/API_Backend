@@ -1,14 +1,46 @@
 {
   "info": {
     "name": "API MMORPG",
-    "description": "Parcours de l'API (Backlog.md §1), complété à chaque lot. L1 : santé, inscription, connexion, compte courant. Lancer le dossier dans l'ordre avec le Runner.",
+    "description": "Parcours de l'API (Backlog.md §1), complété à chaque lot. L1 : santé, inscription, connexion, compte courant. L2 : classes, personnages, statistiques. Lancer la collection dans l'ordre avec le Runner.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:4001" },
-    { "key": "email", "value": "" },
-    { "key": "password", "value": "correct-horse-battery-staple" },
-    { "key": "token", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4001"
+    },
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "password",
+      "value": "correct-horse-battery-staple"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "classId",
+      "value": ""
+    },
+    {
+      "key": "characterId",
+      "value": ""
+    },
+    {
+      "key": "otherEmail",
+      "value": ""
+    },
+    {
+      "key": "otherToken",
+      "value": ""
+    },
+    {
+      "key": "characterName",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -16,7 +48,10 @@
       "item": [
         {
           "name": "Santé du service",
-          "request": { "method": "GET", "url": "{{baseUrl}}/health" },
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          },
           "event": [
             {
               "listen": "test",
@@ -37,14 +72,24 @@
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/api/v1/auth/register",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
           },
           "event": [
             {
               "listen": "prerequest",
               "script": {
-                "exec": ["pm.collectionVariables.set('email', `player.${Date.now()}.l1@example.com`);"]
+                "exec": [
+                  "pm.collectionVariables.set('email', `player.${Date.now()}.l1@example.com`);"
+                ]
               }
             },
             {
@@ -66,8 +111,16 @@
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/api/v1/auth/register",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
           },
           "event": [
             {
@@ -88,8 +141,16 @@
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/api/v1/auth/login",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
           },
           "event": [
             {
@@ -111,8 +172,16 @@
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/api/v1/auth/login",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"wrong-password\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"wrong-password\"\n}"
+            }
           },
           "event": [
             {
@@ -133,7 +202,16 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/api/v1/auth/me",
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] }
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "event": [
             {
@@ -151,7 +229,10 @@
         },
         {
           "name": "Mon compte — sans jeton (401)",
-          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/auth/me" },
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/auth/me"
+          },
           "event": [
             {
               "listen": "test",
@@ -161,6 +242,309 @@
                   "    pm.response.to.have.status(401);",
                   "    pm.response.to.have.header('WWW-Authenticate');",
                   "    pm.expect(pm.response.json().error.code).to.eql('UNAUTHENTICATED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "L2 — Personnages",
+      "item": [
+        {
+          "name": "Classes (public)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/classes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, 3 classes triées par nom', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().data.map(c => c.name)).to.eql(['Guerrier', 'Mage', 'Voleur']);",
+                  "});",
+                  "pm.collectionVariables.set('classId', pm.response.json().data.find(c => c.code === 'warrior').id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Créer un personnage",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/characters",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{characterName}}\",\n  \"classId\": \"{{classId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const letters = 'abcdefghijklmnopqrstuvwxyz';",
+                  "let suffix = '';",
+                  "for (let i = 0; i < 8; i++) suffix += letters[Math.floor(Math.random() * letters.length)];",
+                  "pm.collectionVariables.set('characterName', 'Hero' + suffix);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201, niveau 1, XP 0', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data.level).to.eql(1);",
+                  "    pm.expect(data.experience).to.eql(0);",
+                  "});",
+                  "pm.collectionVariables.set('characterId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Créer — niveau fourni par le client (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/characters",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cheater\",\n  \"classId\": \"{{classId}}\",\n  \"level\": 10\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 VALIDATION_ERROR', () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mes personnages",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/characters",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, contient le personnage créé', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().data.map(c => c.id)).to.include(pm.collectionVariables.get('characterId'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mon personnage",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/characters/{{characterId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Statistiques",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/characters/{{characterId}}/stats",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, guerrier niveau 1', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data.stats.maxHp).to.eql(120);",
+                  "    pm.expect(data.stats.currentHp).to.eql(120);",
+                  "    pm.expect(data.experienceToNextLevel).to.eql(100);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Autre joueur — inscription",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{otherEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('otherEmail', `other.${Date.now()}.l2@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Autre joueur — connexion",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{otherEmail}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('otherToken', pm.response.json().data.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Personnage d'un autre joueur (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/characters/{{characterId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{otherToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 CHARACTER_NOT_FOUND', () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('CHARACTER_NOT_FOUND');",
                   "});"
                 ]
               }
