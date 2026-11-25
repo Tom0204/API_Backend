@@ -18,7 +18,7 @@ Hors projet : voir `docs/rules.md` §1.
 | Jour | Lot | Tickets | Résultat en fin de journée | Statut | Commit |
 |---|---|---|---|---|---|
 | 1 | L1 Socle et identité | ARCH-01 à ARCH-04, ID-01 à ID-03 | Structure en couches validée, base prête, inscription et connexion | ✅ | a4deeb2 |
-| 2 | L2 Personnages | CHAR-01 à CHAR-04 | Créer et consulter ses personnages, statistiques et progression | ✅ | — |
+| 2 | L2 Personnages | CHAR-01 à CHAR-04 | Créer et consulter ses personnages, statistiques et progression | ✅ | 9717d55 |
 | 3 | L3 Monde et combat | WORLD-01, COMBAT-01 à COMBAT-03 | Combat jouable jusqu'à la victoire ou la défaite | ⏳ | — |
 | 4 | L4 Récompenses et livraison | REWARD-01, INV-01, DOC-01, QUAL-01 | Parcours complet, collection Postman, README | ⏳ | — |
 
@@ -31,6 +31,7 @@ Uniquement ce qui modifie un ticket : critère reporté, code ou statut différe
 | Ticket | Écart | Raison | Reprise |
 |---|---|---|---|
 | ARCH-03 | Migration initiale sans les tables de combat ni d'inventaire (L1 E1) | Agrégats `Combat` et `Inventory` pas encore conçus | Migrations de COMBAT-01/02 (L3) et INV-01 (L4) |
+| CHAR-02 | Critère « inventaire vide » reporté : pas encore de table d'inventaire (L2 E1) | Agrégat `Inventory` conçu en L4 | INV-01 : un personnage sans ligne d'inventaire a un inventaire vide |
 
 ---
 
@@ -106,72 +107,72 @@ Format : **Objectif**, **Critères** (3 à 5), **Tests**. Les exemples chiffrés
 ### Jour 2 — Personnages
 
 #### CHAR-01 — Catalogue des classes
-**Statut :** ⏳ · **Dépend de :** ARCH-03 · **Règles :** §3
+**Statut :** ✅ · **Dépend de :** ARCH-03 · **Règles :** §3
 **Objectif :** `GET /api/v1/classes` (public), lecture des données de référence.
 **Critères :**
-- [ ] Les 3 classes avec statistiques de niveau 1 et gains par niveau ; aucune route d'écriture.
+- [x] Les 3 classes avec statistiques de niveau 1 et gains par niveau ; aucune route d'écriture.
 **Tests :** forme exacte, valeurs de `rules.md` §3.
 
 #### CHAR-02 — Créer un personnage
-**Statut :** ⏳ · **Dépend de :** CHAR-01, ID-03 · **Règles :** §4
+**Statut :** ✅ · **Dépend de :** CHAR-01, ID-03 · **Règles :** §4
 **Objectif :** agrégat `Character`, cas d'usage `CreateCharacter`, `POST /api/v1/characters` (exemple de `docs/architecture.md`).
 **Critères :**
-- [ ] `CharacterName` (3 à 16 lettres) ; nom unique sans tenir compte de la casse → 409 `CHARACTER_NAME_TAKEN`.
-- [ ] 5 personnages au plus par compte, **même en concurrence** → 409 `CHARACTER_LIMIT_REACHED`.
-- [ ] Niveau 1, XP 0, zone de départ, inventaire vide ; propriétaire tiré du jeton ; classe inconnue → 422 `CLASS_NOT_FOUND`.
+- [x] `CharacterName` (3 à 16 lettres) ; nom unique sans tenir compte de la casse → 409 `CHARACTER_NAME_TAKEN`.
+- [x] 5 personnages au plus par compte, **même en concurrence** → 409 `CHARACTER_LIMIT_REACHED`.
+- [x] Niveau 1, XP 0, zone de départ, inventaire vide ; propriétaire tiré du jeton ; classe inconnue → 422 `CLASS_NOT_FOUND`.
 **Tests :** objets-valeurs ; cas d'usage ; HTTP ; PostgreSQL : 8 créations simultanées → exactement 5.
 
 #### CHAR-03 — Consulter ses personnages
-**Statut :** ⏳ · **Dépend de :** CHAR-02
+**Statut :** ✅ · **Dépend de :** CHAR-02
 **Objectif :** `GET /api/v1/characters` et `GET /api/v1/characters/:characterId`.
 **Critères :**
-- [ ] Seulement les personnages du compte ; celui d'un autre joueur → même 404 `CHARACTER_NOT_FOUND` qu'un inexistant.
+- [x] Seulement les personnages du compte ; celui d'un autre joueur → même 404 `CHARACTER_NOT_FOUND` qu'un inexistant.
 **Tests :** liste vide, isolation entre comptes, réponses 404 identiques.
 
 #### CHAR-04 — Statistiques et progression
-**Statut :** ⏳ · **Dépend de :** CHAR-03 · **Règles :** §3, §5
+**Statut :** ✅ · **Dépend de :** CHAR-03 · **Règles :** §3, §5
 **Objectif :** objets-valeurs `Stats` et `Progression`, `Character.gainExperience`, `GET /api/v1/characters/:characterId/stats`.
 **Critères :**
-- [ ] `Stats.forLevel(classe, niveau)` = base + gain × (niveau − 1) ; jamais stockées ; ressources = maximum.
-- [ ] `Progression.gain(xp)` : passages multiples, niveau 10 avec XP 0, gain entier sûr ≥ 1.
-- [ ] Aucune route ne modifie le niveau ou l'XP.
+- [x] `Stats.forLevel(classe, niveau)` = base + gain × (niveau − 1) ; jamais stockées ; ressources = maximum.
+- [x] `Progression.gain(xp)` : passages multiples, niveau 10 avec XP 0, gain entier sûr ≥ 1.
+- [x] Aucune route ne modifie le niveau ou l'XP.
 **Tests :** tableau d'XP de §5, exemple 90 + 300 → niveau 3 avec 7 XP, niveaux 1, 5 et 10 des 3 classes.
 
 ### Jour 3 — Monde et combat
 
 #### WORLD-01 — Monstres d'une zone
-**Statut :** ⏳ · **Dépend de :** ARCH-03, ID-03 · **Règles :** §8
+**Statut :** ✅ · **Dépend de :** ARCH-03, ID-03 · **Règles :** §8
 **Objectif :** `GET /api/v1/zones/:zoneId/monsters`.
 **Critères :**
-- [ ] Les 3 monstres de la Clairière avec leurs statistiques ; zone inconnue → 404 `ZONE_NOT_FOUND`.
+- [x] Les 3 monstres de la Clairière avec leurs statistiques ; zone inconnue → 404 `ZONE_NOT_FOUND`.
 **Tests :** valeurs du seed, 404.
 
 #### COMBAT-01 — Agrégat `Combat`
-**Statut :** ⏳ · **Dépend de :** CHAR-04 · **Règles :** §6
+**Statut :** ✅ · **Dépend de :** CHAR-04 · **Règles :** §6
 **Objectif :** agrégat `Combat` **pur** : initiative, dégâts, alternance, états. Aucune base, aucune route.
 **Critères :**
-- [ ] Statistiques des deux participants figées à la création ; initiative au plus rapide, égalité → personnage.
-- [ ] Dégâts `max(1, ⌊attaque × 100 / (100 + défense)⌋)` ; PV bornés à 0.
-- [ ] `IN_PROGRESS` → `VICTORY` / `DEFEAT`, terminaux ; action sur un combat terminé → `COMBAT_FINISHED`.
+- [x] Statistiques des deux participants figées à la création ; initiative au plus rapide, égalité → personnage.
+- [x] Dégâts `max(1, ⌊attaque × 100 / (100 + défense)⌋)` ; PV bornés à 0.
+- [x] `IN_PROGRESS` → `VICTORY` / `DEFEAT`, terminaux ; action sur un combat terminé → `COMBAT_FINISHED`.
 **Tests :** tableau des dégâts de §6, exemple complet loup contre guerrier de §8 (92 PV restants).
 
 #### COMBAT-02 — Démarrer un combat
-**Statut :** ⏳ · **Dépend de :** COMBAT-01, WORLD-01
+**Statut :** ✅ · **Dépend de :** COMBAT-01, WORLD-01
 **Objectif :** cas d'usage `StartCombat`, `POST /api/v1/combats` (`characterId`, `monsterId`).
 **Critères :**
-- [ ] Personnage inexistant ou d'un autre joueur → 422 `CHARACTER_NOT_FOUND` ; monstre hors zone → 422 `MONSTER_NOT_IN_ZONE`.
-- [ ] Un seul combat `IN_PROGRESS` par personnage, même en concurrence (verrou sur le personnage) → 409 `CHARACTER_ALREADY_IN_COMBAT`.
-- [ ] Si le monstre commence, son premier tour est joué dans la même requête.
+- [x] Personnage inexistant ou d'un autre joueur → 422 `CHARACTER_NOT_FOUND` ; monstre hors zone → 422 `MONSTER_NOT_IN_ZONE`.
+- [x] Un seul combat `IN_PROGRESS` par personnage, même en concurrence (verrou sur le personnage) → 409 `CHARACTER_ALREADY_IN_COMBAT`.
+- [x] Si le monstre commence, son premier tour est joué dans la même requête.
 **Tests :** cas d'usage, HTTP, PostgreSQL : 2 démarrages simultanés → 1 seul combat.
 
 #### COMBAT-03 — Jouer un tour et consulter un combat
-**Statut :** ⏳ · **Dépend de :** COMBAT-02
+**Statut :** ✅ · **Dépend de :** COMBAT-02
 **Objectif :** `POST /api/v1/combats/:combatId/actions` (`{ "type": "ATTACK" }`) et `GET /api/v1/combats/:combatId`.
 **Critères :**
-- [ ] Le joueur attaque, le monstre riposte dans la même réponse ; combat d'un autre joueur → 404 `COMBAT_NOT_FOUND`.
-- [ ] Action sur un combat terminé → 422 `COMBAT_FINISHED`.
-- [ ] Deux actions simultanées : le combat est verrouillé (`findByIdForUpdate`), elles s'exécutent l'une après l'autre.
-- [ ] Fin du combat : PV et mana du personnage remis au maximum (rien n'est stocké).
+- [x] Le joueur attaque, le monstre riposte dans la même réponse ; combat d'un autre joueur → 404 `COMBAT_NOT_FOUND`.
+- [x] Action sur un combat terminé → 422 `COMBAT_FINISHED`.
+- [x] Deux actions simultanées : le combat est verrouillé (`findByIdForUpdate`), elles s'exécutent l'une après l'autre.
+- [x] Fin du combat : PV et mana du personnage remis au maximum (rien n'est stocké).
 **Tests :** parcours jusqu'à `VICTORY` et jusqu'à `DEFEAT`, 404, 422, concurrence sur PostgreSQL.
 
 ### Jour 4 — Récompenses et livraison

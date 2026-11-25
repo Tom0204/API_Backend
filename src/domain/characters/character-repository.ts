@@ -2,6 +2,8 @@ import type { Character, NewCharacter } from './character'
 
 export interface CharacterRepository {
     findById(id: string): Promise<Character | undefined>
+    /** Dans une transaction : verrouille le personnage jusqu'à la fin de la transaction. */
+    findByIdForUpdate(id: string): Promise<Character | undefined>
     /** Personnages d'un compte, du plus ancien au plus récent. */
     findByAccount(accountId: string): Promise<Character[]>
     /** Dans une transaction : verrouille le compte, puis compte ses personnages. */

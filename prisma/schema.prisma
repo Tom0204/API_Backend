@@ -1,4 +1,4 @@
-// Schéma initial (ARCH-03). Les combats (L3) et l'inventaire (L4) seront ajoutés par migration (adaptation E1).
+// Schéma initial (ARCH-03), combats (L3). L'inventaire (L4) sera ajouté par migration (adaptation L1 E1).
 // Identifiants UUID v7 générés par PostgreSQL 18. Contraintes CHECK : ajoutées en SQL dans la migration.
 
 generator client {
@@ -94,8 +94,9 @@ model MonsterTemplate {
   lootItemId String? @map("loot_item_id") @db.Uuid
   /// Probabilité p du butin, dans [0, 1] ; nulle si le monstre n'a pas de butin.
   lootChance Float?  @map("loot_chance")
-  zone       Zone    @relation(fields: [zoneId], references: [id], onDelete: Restrict)
-  lootItem   Item?   @relation(fields: [lootItemId], references: [id], onDelete: Restrict)
+  zone       Zone     @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  lootItem   Item?    @relation(fields: [lootItemId], references: [id], onDelete: Restrict)
+  combats    Combat[]
 
   @@index([zoneId])
   @@map("monster_templates")
@@ -115,7 +116,42 @@ model Character {
   account    Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
   class      CharacterClass @relation(fields: [classId], references: [id], onDelete: Restrict)
   zone       Zone           @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  combats    Combat[]
 
   @@index([accountId])
   @@map("characters")
+}
+
+enum CombatStatus {
+  IN_PROGRESS
+  VICTORY
+  DEFEAT
+
+  @@map("combat_status")
+}
+
+/// Combat (rules.md §6) : statistiques des deux participants figées au départ, PV courants bornés à 0.
+/// Un seul combat IN_PROGRESS par personnage : verrou sur le personnage + index unique partiel ajouté en SQL.
+model Combat {
+  id                String          @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  characterId       String          @map("character_id") @db.Uuid
+  monsterTemplateId String          @map("monster_template_id") @db.Uuid
+  status            CombatStatus    @default(IN_PROGRESS)
+  characterMaxHp    Int             @map("character_max_hp")
+  characterHp       Int             @map("character_hp")
+  characterAttack   Int             @map("character_attack")
+  characterDefense  Int             @map("character_defense")
+  characterSpeed    Int             @map("character_speed")
+  monsterMaxHp      Int             @map("monster_max_hp")
+  monsterHp         Int             @map("monster_hp")
+  monsterAttack     Int             @map("monster_attack")
+  monsterDefense    Int             @map("monster_defense")
+  monsterSpeed      Int             @map("monster_speed")
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  finishedAt        DateTime?       @map("finished_at") @db.Timestamptz(3)
+  character         Character       @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  monsterTemplate   MonsterTemplate @relation(fields: [monsterTemplateId], references: [id], onDelete: Restrict)
+
+  @@index([characterId])
+  @@map("combats")
 }

@@ -14,7 +14,15 @@ import { Email } from '../../src/domain/identity/email'
 import { identityErrors } from '../../src/domain/identity/identity-errors'
 import { Session } from '../../src/domain/identity/session'
 import type { SessionRepository } from '../../src/domain/identity/session-repository'
-import { CHARACTER_CLASSES } from '../../src/infrastructure/prisma/seed-reference-data'
+import { Combat, type CombatStatus } from '../../src/domain/combat/combat'
+import { combatErrors } from '../../src/domain/combat/combat-errors'
+import type { CombatRepository } from '../../src/domain/combat/combat-repository'
+import { Combatant, type CombatantStats } from '../../src/domain/combat/combatant'
+import { STARTING_ZONE_CODE } from '../../src/domain/shared/game-rules'
+import { MonsterTemplate, type MonsterTemplateProps } from '../../src/domain/world/monster-template'
+import type { WorldRepository } from '../../src/domain/world/world-repository'
+import { Zone, type ZoneProps } from '../../src/domain/world/zone'
+import { CHARACTER_CLASSES, MONSTER_TEMPLATES, ZONES } from '../../src/infrastructure/prisma/seed-reference-data'
 
 interface AccountRecord {
     id: string
@@ -49,15 +57,46 @@ interface CharacterRecord {
     createdAt: Date
 }
 
+type MonsterRecord = MonsterTemplateProps
+
+interface CombatRecord {
+    id: string
+    characterId: string
+    monsterTemplateId: string
+    status: CombatStatus
+    character: { stats: CombatantStats; hp: number }
+    monster: { stats: CombatantStats; hp: number }
+    createdAt: Date
+    finishedAt: Date | null
+}
+
 export interface InMemoryState {
     accounts: AccountRecord[]
     sessions: SessionRecord[]
     classes: CharacterClassRecord[]
     characters: CharacterRecord[]
+    zones: ZoneProps[]
+    monsters: MonsterRecord[]
+    combats: CombatRecord[]
 }
 
 /** Zone de départ des tests sans base (équivalent de la Clairière du seed). */
 export const IN_MEMORY_STARTING_ZONE_ID = '0197f2a0-0000-7000-8000-00000000c1ea'
+
+function seedZones(): ZoneProps[] {
+    return ZONES.map((zone) => ({
+        ...zone,
+        id: zone.code === STARTING_ZONE_CODE ? IN_MEMORY_STARTING_ZONE_ID : randomUUID()
+    }))
+}
+
+function seedMonsters(zones: ZoneProps[]): MonsterRecord[] {
+    return MONSTER_TEMPLATES.map(({ zoneCode, loot: _loot, ...monster }) => {
+        const zone = zones.find((candidate) => candidate.code === zoneCode)
+        if (!zone) throw new Error(`Zone inconnue : ${zoneCode}`)
+        return { ...monster, id: randomUUID(), zoneId: zone.id }
+    })
+}
 
 /**
  * Base en mémoire avec les garanties du `UnitOfWork` Prisma :
@@ -76,7 +115,10 @@ export class InMemoryDatabase implements UnitOfWork {
             base: { ...characterClass.base },
             perLevel: { ...characterClass.perLevel }
         })),
-        characters: []
+        characters: [],
+        zones: [],
+        monsters: [],
+        combats: []
     }
     private queue: Promise<unknown> = Promise.resolve()
 
@@ -89,6 +131,18 @@ export class InMemoryDatabase implements UnitOfWork {
         })
         this.queue = next.catch(() => undefined)
         return next
+    }
+
+    constructor() {
+        this.state.zones = seedZones()
+        this.state.monsters = seedMonsters(this.state.zones)
+    }
+
+    /** Identifiant d'un monstre du seed, par son code (`wolf`, `boar`, `bandit`). */
+    monsterId(code: string): string {
+        const found = this.state.monsters.find((monster) => monster.code === code)
+        if (!found) throw new Error(`Monstre inconnu : ${code}`)
+        return found.id
     }
 
     /** Identifiant d'une classe du seed, par son code (`warrior`, `mage`, `rogue`). */
@@ -104,7 +158,94 @@ function createRepositories(draft: InMemoryState): Repositories {
         accounts: createAccountRepository(draft),
         sessions: createSessionRepository(draft),
         characters: createCharacterRepository(draft),
-        classes: createCharacterClassRepository(draft)
+        classes: createCharacterClassRepository(draft),
+        world: createWorldRepository(draft),
+        combats: createCombatRepository(draft)
+    }
+}
+
+function createWorldRepository(draft: InMemoryState): WorldRepository {
+    return {
+        findZoneById: async (id) => {
+            const zone = draft.zones.find((record) => record.id === id)
+            return zone ? Zone.restore({ ...zone }) : undefined
+        },
+        findMonstersByZone: async (zoneId) =>
+            draft.monsters
+                .filter((record) => record.zoneId === zoneId)
+                .sort((a, b) => a.level - b.level)
+                .map((record) => MonsterTemplate.restore({ ...record })),
+        findMonsterById: async (id) => {
+            const monster = draft.monsters.find((record) => record.id === id)
+            return monster ? MonsterTemplate.restore({ ...monster }) : undefined
+        }
+    }
+}
+
+function createCombatRepository(draft: InMemoryState): CombatRepository {
+    const restore = (record: CombatRecord): Combat => {
+        const monster = draft.monsters.find((candidate) => candidate.id === record.monsterTemplateId)
+        if (!monster) throw new Error('Clé étrangère violée : monstre inexistant')
+        return Combat.restore({
+            id: record.id,
+            characterId: record.characterId,
+            monsterTemplateId: record.monsterTemplateId,
+            monsterName: monster.name,
+            status: record.status,
+            character: Combatant.of({ ...record.character.stats }, record.character.hp),
+            monster: Combatant.of({ ...record.monster.stats }, record.monster.hp),
+            createdAt: record.createdAt,
+            finishedAt: record.finishedAt
+        })
+    }
+    const findRecord = (id: string) => draft.combats.find((record) => record.id === id)
+
+    return {
+        findById: async (id) => {
+            const record = findRecord(id)
+            return record ? restore(record) : undefined
+        },
+        // Les unités de travail sont déjà exécutées l'une après l'autre : équivalent du verrou sur le combat.
+        findByIdForUpdate: async (id) => {
+            const record = findRecord(id)
+            return record ? restore(record) : undefined
+        },
+        hasInProgressForCharacter: async (characterId) =>
+            draft.combats.some((record) => record.characterId === characterId && record.status === 'IN_PROGRESS'),
+        insert: async (combat) => {
+            if (
+                combat.status === 'IN_PROGRESS' &&
+                draft.combats.some((record) => record.characterId === combat.characterId && record.status === 'IN_PROGRESS')
+            ) {
+                throw combatErrors.alreadyInCombat() // équivalent de l'index unique partiel
+            }
+            if (!draft.characters.some((record) => record.id === combat.characterId)) {
+                throw new Error('Clé étrangère violée : personnage inexistant')
+            }
+            const record: CombatRecord = {
+                id: randomUUID(),
+                characterId: combat.characterId,
+                monsterTemplateId: combat.monsterTemplateId,
+                status: combat.status,
+                character: { stats: { ...combat.character.stats }, hp: combat.character.hp },
+                monster: { stats: { ...combat.monster.stats }, hp: combat.monster.hp },
+                createdAt: new Date(),
+                finishedAt: combat.finishedAt
+            }
+            draft.combats.push(record)
+            return restore(record)
+        },
+        save: async (combat) => {
+            const { id, status, character, monster, finishedAt } = combat.snapshot
+            const record = findRecord(id)
+            if (!record) throw new Error('Combat inexistant')
+            Object.assign(record, {
+                status,
+                finishedAt,
+                character: { ...record.character, hp: character.hp },
+                monster: { ...record.monster, hp: monster.hp }
+            })
+        }
     }
 }
 
@@ -158,6 +299,8 @@ function createCharacterClassRepository(draft: InMemoryState): CharacterClassRep
 function createCharacterRepository(draft: InMemoryState): CharacterRepository {
     return {
         findById: async (id) => toCharacter(draft.characters.find((record) => record.id === id)),
+        // Exécution en série : équivalent du verrou sur le personnage.
+        findByIdForUpdate: async (id) => toCharacter(draft.characters.find((record) => record.id === id)),
         findByAccount: async (accountId) =>
             draft.characters
                 .filter((record) => record.accountId === accountId)

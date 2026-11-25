@@ -15,6 +15,14 @@ export function createPrismaCharacterRepository(tx: Prisma.TransactionClient): C
             return row ? toCharacter(row) : undefined
         },
 
+        async findByIdForUpdate(id) {
+            // Verrou réel sur la ligne, puis reconstruction de l'agrégat.
+            const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM characters WHERE id = ${id}::uuid FOR UPDATE`
+            if (locked.length === 0) return undefined
+            const row = await tx.character.findUnique({ where: { id } })
+            return row ? toCharacter(row) : undefined
+        },
+
         async findByAccount(accountId) {
             const rows = await tx.character.findMany({ where: { accountId }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] })
             return rows.map(toCharacter)

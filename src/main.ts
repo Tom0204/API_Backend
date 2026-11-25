@@ -3,7 +3,11 @@ import { createGetCharacterStats } from './application/characters/get-character-
 import { createGetMyCharacter } from './application/characters/get-my-character'
 import { createListClasses } from './application/characters/list-classes'
 import { createListMyCharacters } from './application/characters/list-my-characters'
+import { createGetMyCombat } from './application/combat/get-my-combat'
+import { createPlayCombatAction } from './application/combat/play-combat-action'
+import { createStartCombat } from './application/combat/start-combat'
 import { createCheckHealth } from './application/health/check-health'
+import { createListZoneMonsters } from './application/world/list-zone-monsters'
 import { createAuthenticate } from './application/identity/authenticate'
 import { createGetCurrentAccount } from './application/identity/get-current-account'
 import { createLogin } from './application/identity/login'
@@ -49,7 +53,11 @@ async function main(): Promise<void> {
             createCharacter: createCreateCharacter({ unitOfWork, startingZoneId }),
             listMyCharacters: createListMyCharacters({ unitOfWork }),
             getMyCharacter: createGetMyCharacter({ unitOfWork }),
-            getCharacterStats: createGetCharacterStats({ unitOfWork })
+            getCharacterStats: createGetCharacterStats({ unitOfWork }),
+            listZoneMonsters: createListZoneMonsters({ unitOfWork }),
+            startCombat: createStartCombat({ unitOfWork, clock }),
+            playCombatAction: createPlayCombatAction({ unitOfWork, clock }),
+            getMyCombat: createGetMyCombat({ unitOfWork })
         },
         { logger, corsOrigins: env.CORS_ORIGINS }
     )

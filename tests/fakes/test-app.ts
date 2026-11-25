@@ -5,7 +5,11 @@ import { createGetCharacterStats } from '../../src/application/characters/get-ch
 import { createGetMyCharacter } from '../../src/application/characters/get-my-character'
 import { createListClasses } from '../../src/application/characters/list-classes'
 import { createListMyCharacters } from '../../src/application/characters/list-my-characters'
+import { createGetMyCombat } from '../../src/application/combat/get-my-combat'
+import { createPlayCombatAction } from '../../src/application/combat/play-combat-action'
+import { createStartCombat } from '../../src/application/combat/start-combat'
 import { createCheckHealth } from '../../src/application/health/check-health'
+import { createListZoneMonsters } from '../../src/application/world/list-zone-monsters'
 import { createAuthenticate } from '../../src/application/identity/authenticate'
 import { createGetCurrentAccount } from '../../src/application/identity/get-current-account'
 import { createLogin } from '../../src/application/identity/login'
@@ -44,7 +48,11 @@ export function buildTestApp(overrides: Partial<Omit<AppOptions, 'logger'>> = {}
             createCharacter: createCreateCharacter({ ...deps, startingZoneId: IN_MEMORY_STARTING_ZONE_ID }),
             listMyCharacters: createListMyCharacters(deps),
             getMyCharacter: createGetMyCharacter(deps),
-            getCharacterStats: createGetCharacterStats(deps)
+            getCharacterStats: createGetCharacterStats(deps),
+            listZoneMonsters: createListZoneMonsters(deps),
+            startCombat: createStartCombat(deps),
+            playCombatAction: createPlayCombatAction(deps),
+            getMyCombat: createGetMyCombat(deps)
         },
         { logger, corsOrigins: [], ...overrides }
     )

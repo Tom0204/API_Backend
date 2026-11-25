@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "API MMORPG",
-    "description": "Parcours de l'API (Backlog.md §1), complété à chaque lot. L1 : santé, inscription, connexion, compte courant. L2 : classes, personnages, statistiques. Lancer la collection dans l'ordre avec le Runner.",
+    "description": "Parcours de l'API (Backlog.md §1), complété à chaque lot. L1 : santé, inscription, connexion, compte courant. L2 : classes, personnages, statistiques. L3 : monstres de la zone, combat jusqu’à la victoire. Lancer la collection dans l'ordre avec le Runner.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -39,6 +39,18 @@
     },
     {
       "key": "characterName",
+      "value": ""
+    },
+    {
+      "key": "zoneId",
+      "value": ""
+    },
+    {
+      "key": "monsterId",
+      "value": ""
+    },
+    {
+      "key": "combatId",
       "value": ""
     }
   ],
@@ -545,6 +557,324 @@
                   "pm.test('404 CHARACTER_NOT_FOUND', () => {",
                   "    pm.response.to.have.status(404);",
                   "    pm.expect(pm.response.json().error.code).to.eql('CHARACTER_NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "L3 — Monde et combat",
+      "item": [
+        {
+          "name": "Zone du personnage",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/characters/{{characterId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('zoneId', pm.response.json().data.zoneId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Monstres de la zone",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/zones/{{zoneId}}/monsters",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, Loup / Sanglier / Bandit', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().data.map(m => m.name)).to.eql(['Loup', 'Sanglier', 'Bandit']);",
+                  "});",
+                  "pm.collectionVariables.set('monsterId', pm.response.json().data.find(m => m.code === 'wolf').id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Démarrer un combat contre le loup",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/combats",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"characterId\": \"{{characterId}}\",\n  \"monsterId\": \"{{monsterId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('201, le loup (plus rapide) a joué son premier tour', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data.status).to.eql('IN_PROGRESS');",
+                  "    pm.expect(data.lastTurn.monsterDamage).to.eql(7);",
+                  "});",
+                  "pm.collectionVariables.set('combatId', pm.response.json().data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Démarrer un second combat (409)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/combats",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"characterId\": \"{{characterId}}\",\n  \"monsterId\": \"{{monsterId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('409 CHARACTER_ALREADY_IN_COMBAT', () => {",
+                  "    pm.response.to.have.status(409);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('CHARACTER_ALREADY_IN_COMBAT');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attaquer",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/combats/{{combatId}}/actions",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"ATTACK\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "// Runner : rejoue cette requête tant que le combat est en cours.",
+                  "if (pm.response.json().data.status === 'IN_PROGRESS') pm.execution.setNextRequest('Attaquer');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consulter le combat terminé",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/combats/{{combatId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, VICTORY avec 92 PV (exemple de rules.md §8)', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data.status).to.eql('VICTORY');",
+                  "    pm.expect(data.character.hp).to.eql(92);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Attaquer après la fin (422)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/combats/{{combatId}}/actions",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"ATTACK\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('422 COMBAT_FINISHED', () => {",
+                  "    pm.response.to.have.status(422);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('COMBAT_FINISHED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Combat d'un autre joueur (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/combats/{{combatId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{otherToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 COMBAT_NOT_FOUND', () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('COMBAT_NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Statistiques après le combat",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/characters/{{characterId}}/stats",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('PV de nouveau au maximum', () => {",
+                  "    const stats = pm.response.json().data.stats;",
+                  "    pm.expect(stats.currentHp).to.eql(stats.maxHp);",
                   "});"
                 ]
               }
