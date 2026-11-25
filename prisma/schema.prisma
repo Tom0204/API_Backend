@@ -1,0 +1,121 @@
+// Schéma initial (ARCH-03). Les combats (L3) et l'inventaire (L4) seront ajoutés par migration (adaptation E1).
+// Identifiants UUID v7 générés par PostgreSQL 18. Contraintes CHECK : ajoutées en SQL dans la migration.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id           String      @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  /// Toujours en minuscules (objet-valeur Email).
+  email        String      @unique @db.VarChar(254)
+  passwordHash String      @map("password_hash")
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  sessions     Session[]
+  characters   Character[]
+
+  @@map("accounts")
+}
+
+model Session {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  accountId String   @map("account_id") @db.Uuid
+  /// Empreinte SHA-256 (hexadécimal) du jeton ; le jeton en clair n'est jamais stocké.
+  tokenHash String   @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@map("sessions")
+}
+
+/// Données de référence (rules.md §3) : statistiques de niveau 1 et gain par niveau.
+model CharacterClass {
+  id              String      @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  code            String      @unique @db.VarChar(32)
+  name            String      @db.VarChar(64)
+  baseHp          Int         @map("base_hp")
+  baseMana        Int         @map("base_mana")
+  baseAttack      Int         @map("base_attack")
+  baseDefense     Int         @map("base_defense")
+  baseSpeed       Int         @map("base_speed")
+  hpPerLevel      Int         @map("hp_per_level")
+  manaPerLevel    Int         @map("mana_per_level")
+  attackPerLevel  Int         @map("attack_per_level")
+  defensePerLevel Int         @map("defense_per_level")
+  speedPerLevel   Int         @map("speed_per_level")
+  characters      Character[]
+
+  @@map("character_classes")
+}
+
+/// Données de référence (rules.md §8).
+model Zone {
+  id         String            @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  code       String            @unique @db.VarChar(32)
+  name       String            @db.VarChar(64)
+  minLevel   Int               @map("min_level")
+  maxLevel   Int               @map("max_level")
+  monsters   MonsterTemplate[]
+  characters Character[]
+
+  @@map("zones")
+}
+
+/// Objets de butin : matériaux sans effet (rules.md §10).
+model Item {
+  id       String            @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  code     String            @unique @db.VarChar(32)
+  name     String            @db.VarChar(64)
+  droppers MonsterTemplate[]
+
+  @@map("items")
+}
+
+/// Modèle de monstre (rules.md §8) : chaque combat en crée sa propre instance.
+model MonsterTemplate {
+  id         String  @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  code       String  @unique @db.VarChar(32)
+  zoneId     String  @map("zone_id") @db.Uuid
+  name       String  @db.VarChar(64)
+  level      Int
+  hp         Int
+  attack     Int
+  defense    Int
+  speed      Int
+  xpReward   Int     @map("xp_reward")
+  lootItemId String? @map("loot_item_id") @db.Uuid
+  /// Probabilité p du butin, dans [0, 1] ; nulle si le monstre n'a pas de butin.
+  lootChance Float?  @map("loot_chance")
+  zone       Zone    @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  lootItem   Item?   @relation(fields: [lootItemId], references: [id], onDelete: Restrict)
+
+  @@index([zoneId])
+  @@map("monster_templates")
+}
+
+/// Niveau et XP dans le niveau courant (rules.md §5) ; les statistiques ne sont jamais stockées.
+model Character {
+  id         String         @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  accountId  String         @map("account_id") @db.Uuid
+  classId    String         @map("class_id") @db.Uuid
+  zoneId     String         @map("zone_id") @db.Uuid
+  /// Unicité sans tenir compte de la casse : index unique sur lower(name), ajouté en SQL.
+  name       String         @db.VarChar(16)
+  level      Int            @default(1)
+  experience Int            @default(0)
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  account    Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  class      CharacterClass @relation(fields: [classId], references: [id], onDelete: Restrict)
+  zone       Zone           @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+
+  @@index([accountId])
+  @@map("characters")
+}

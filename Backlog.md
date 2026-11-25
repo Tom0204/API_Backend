@@ -17,7 +17,7 @@ Hors projet : voir `docs/rules.md` §1.
 
 | Jour | Lot | Tickets | Résultat en fin de journée | Statut | Commit |
 |---|---|---|---|---|---|
-| 1 | L1 Socle et identité | ARCH-01 à ARCH-04, ID-01 à ID-03 | Structure en couches validée, base prête, inscription et connexion | ⏳ | — |
+| 1 | L1 Socle et identité | ARCH-01 à ARCH-04, ID-01 à ID-03 | Structure en couches validée, base prête, inscription et connexion | ✅ | — |
 | 2 | L2 Personnages | CHAR-01 à CHAR-04 | Créer et consulter ses personnages, statistiques et progression | ⏳ | — |
 | 3 | L3 Monde et combat | WORLD-01, COMBAT-01 à COMBAT-03 | Combat jouable jusqu'à la victoire ou la défaite | ⏳ | — |
 | 4 | L4 Récompenses et livraison | REWARD-01, INV-01, DOC-01, QUAL-01 | Parcours complet, collection Postman, README | ⏳ | — |
@@ -30,7 +30,7 @@ Uniquement ce qui modifie un ticket : critère reporté, code ou statut différe
 
 | Ticket | Écart | Raison | Reprise |
 |---|---|---|---|
-| — | — | — | — |
+| ARCH-03 | Migration initiale sans les tables de combat ni d'inventaire (L1 E1) | Agrégats `Combat` et `Inventory` pas encore conçus | Migrations de COMBAT-01/02 (L3) et INV-01 (L4) |
 
 ---
 
@@ -41,66 +41,66 @@ Format : **Objectif**, **Critères** (3 à 5), **Tests**. Les exemples chiffrés
 ### Jour 1 — Socle et identité
 
 #### ARCH-01 — Projet et squelette de référence
-**Statut :** ⏳ · **Dépend de :** —
+**Statut :** ✅ · **Dépend de :** —
 **Objectif :** projet TypeScript strict structuré selon `docs/architecture.md`, avec un premier exemple complet validé.
 **Critères :**
-- [ ] Node 22, TypeScript strict, ESM ; scripts `dev`, `build`, `start`, `typecheck`, `test`.
-- [ ] `.gitignore` (`node_modules/`, `dist/`, `.env`, client Prisma généré), `.gitattributes` (fins de ligne LF), `.env.example` commenté, `docker-compose.yml` (PostgreSQL 18, bases `mmorpg_dev` et `mmorpg_test`).
-- [ ] Arborescence de `docs/architecture.md` §1 ; `DomainError` et traduction des erreurs prêtes.
-- [ ] `tests/architecture.test.ts` échoue si une couche importe une dépendance interdite.
-- [ ] `GET /health` → 200, construit selon le chemin complet `interfaces → application`.
+- [x] Node 22, TypeScript strict, ESM ; scripts `dev`, `build`, `start`, `typecheck`, `test`.
+- [x] `.gitignore` (`node_modules/`, `dist/`, `.env`, client Prisma généré), `.gitattributes` (fins de ligne LF), `.env.example` commenté, `docker-compose.yml` (PostgreSQL 18, bases `mmorpg_dev` et `mmorpg_test`).
+- [x] Arborescence de `docs/architecture.md` §1 ; `DomainError` et traduction des erreurs prêtes.
+- [x] `tests/architecture.test.ts` échoue si une couche importe une dépendance interdite.
+- [x] `GET /health` → 200, construit selon le chemin complet `interfaces → application`.
 **Tests :** règle de dépendance (y compris un cas volontairement fautif), `/health`.
 **À valider avant la suite :** le squelette sert de modèle à tous les tickets.
 
 #### ARCH-02 — Contrat HTTP et erreurs
-**Statut :** ⏳ · **Dépend de :** ARCH-01
+**Statut :** ✅ · **Dépend de :** ARCH-01
 **Objectif :** enveloppes, validation stricte, traduction `DomainError` → statut, conformes à `docs/conventions.md`.
 **Critères :**
-- [ ] Middleware `validate` (Zod strict) : champ inconnu → 400 `VALIDATION_ERROR` avec `details`.
-- [ ] Un seul middleware traduit `kind` en 401, 404, 409, 422 ; toute autre erreur → 500 générique.
-- [ ] Erreurs des handlers asynchrones interceptées ; JSON invalide → 400 `INVALID_JSON` ; route inconnue → 404.
+- [x] Middleware `validate` (Zod strict) : champ inconnu → 400 `VALIDATION_ERROR` avec `details`.
+- [x] Un seul middleware traduit `kind` en 401, 404, 409, 422 ; toute autre erreur → 500 générique.
+- [x] Erreurs des handlers asynchrones interceptées ; JSON invalide → 400 `INVALID_JSON` ; route inconnue → 404.
 **Tests :** chaque ligne de `docs/conventions.md` §5.
 
 #### ARCH-03 — Base de données, seed et unité de travail
-**Statut :** ⏳ · **Dépend de :** ARCH-01 · **Règles :** §3, §8
+**Statut :** ✅ · **Dépend de :** ARCH-01 · **Règles :** §3, §8
 **Objectif :** PostgreSQL (Docker), Prisma, schéma initial, données de référence, `UnitOfWork`.
 **Critères :**
-- [ ] Migration initiale (comptes, sessions, classes, personnages, zones, monstres, objets, combats, inventaires) avec contraintes `CHECK` des invariants simples.
-- [ ] Seed idempotent conforme à `rules.md` §3 et §8.
-- [ ] `UnitOfWork` Prisma et en mémoire ; base `mmorpg_test` protégée (URL et `current_database()`).
+- [x] Migration initiale (comptes, sessions, classes, personnages, zones, monstres, objets, combats, inventaires) avec contraintes `CHECK` des invariants simples.
+- [x] Seed idempotent conforme à `rules.md` §3 et §8.
+- [x] `UnitOfWork` Prisma et en mémoire ; base `mmorpg_test` protégée (URL et `current_database()`).
 **Tests :** seed lancé deux fois sans doublon ; transaction annulée sur erreur (Prisma et mémoire).
 
 #### ARCH-04 — Sécurité HTTP et logs
-**Statut :** ⏳ · **Dépend de :** ARCH-02
+**Statut :** ✅ · **Dépend de :** ARCH-02
 **Objectif :** protections de `docs/conventions.md` §7.
 **Critères :**
-- [ ] Helmet, CORS, JSON 10 Ko (413), `Content-Type` contrôlé (415), limitation du débit (429, `Retry-After`).
-- [ ] Logs Pino avec `X-Request-Id`, sans corps, jeton, mot de passe ni URL de connexion.
+- [x] Helmet, CORS, JSON 10 Ko (413), `Content-Type` contrôlé (415), limitation du débit (429, `Retry-After`).
+- [x] Logs Pino avec `X-Request-Id`, sans corps, jeton, mot de passe ni URL de connexion.
 **Tests :** 413, 415, 429 ; capture des logs.
 
 #### ID-01 — Inscription
-**Statut :** ⏳ · **Dépend de :** ARCH-02, ARCH-03
+**Statut :** ✅ · **Dépend de :** ARCH-02, ARCH-03
 **Objectif :** cas d'usage `RegisterAccount`, `POST /api/v1/auth/register`.
 **Critères :**
-- [ ] Objet-valeur `Email` (minuscules) ; mot de passe de 15 à 128 caractères.
-- [ ] Hachage Argon2id derrière le port `PasswordHasher` ; ni mot de passe ni hash dans la réponse.
-- [ ] Email déjà utilisé, y compris en concurrence → 409 `EMAIL_ALREADY_USED`.
+- [x] Objet-valeur `Email` (minuscules) ; mot de passe de 15 à 128 caractères.
+- [x] Hachage Argon2id derrière le port `PasswordHasher` ; ni mot de passe ni hash dans la réponse.
+- [x] Email déjà utilisé, y compris en concurrence → 409 `EMAIL_ALREADY_USED`.
 **Tests :** objets-valeurs ; cas d'usage avec faux ; HTTP 201, 400, 409.
 
 #### ID-02 — Connexion
-**Statut :** ⏳ · **Dépend de :** ID-01
+**Statut :** ✅ · **Dépend de :** ID-01
 **Objectif :** cas d'usage `Login`, `POST /api/v1/auth/login`, jeton opaque de 24 h.
 **Critères :**
-- [ ] Email inconnu et mauvais mot de passe → même 401 `INVALID_CREDENTIALS`.
-- [ ] Jeton généré par le port `TokenGenerator` ; seule son empreinte SHA-256 est stockée ; expiration par le port `Clock`.
+- [x] Email inconnu et mauvais mot de passe → même 401 `INVALID_CREDENTIALS`.
+- [x] Jeton généré par le port `TokenGenerator` ; seule son empreinte SHA-256 est stockée ; expiration par le port `Clock`.
 **Tests :** succès, 401 identiques, jeton absent de la base en clair.
 
 #### ID-03 — Routes protégées
-**Statut :** ⏳ · **Dépend de :** ID-02
+**Statut :** ✅ · **Dépend de :** ID-02
 **Objectif :** cas d'usage `Authenticate`, middleware `requireAuth`, `GET /api/v1/auth/me`.
 **Critères :**
-- [ ] Jeton absent, invalide ou expiré → 401 `UNAUTHENTICATED` avec `WWW-Authenticate`.
-- [ ] Les cas d'usage reçoivent `accountId`, jamais un objet Express.
+- [x] Jeton absent, invalide ou expiré → 401 `UNAUTHENTICATED` avec `WWW-Authenticate`.
+- [x] Les cas d'usage reçoivent `accountId`, jamais un objet Express.
 **Tests :** 401 (absent, invalide, expiré avec une horloge de test), 200 sur `/me`.
 
 ### Jour 2 — Personnages

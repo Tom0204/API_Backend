@@ -1,0 +1,16 @@
+# Dépendances et compilation
+node_modules/
+dist/
+coverage/
+
+# Client Prisma généré (npm run db:generate)
+src/generated/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Divers
+*.log
+.DS_Store

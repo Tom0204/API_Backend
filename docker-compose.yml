@@ -1,0 +1,25 @@
+# PostgreSQL 18 : base mmorpg_dev (POSTGRES_DB) et base mmorpg_test (script d'initialisation).
+# Les variables sont lues depuis .env (voir .env.example).
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mmorpg}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
+      POSTGRES_DB: mmorpg_dev
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Depuis l'image 18, les données vivent sous /var/lib/postgresql/<version>/docker.
+      - postgres-data:/var/lib/postgresql
+      # Exécuté uniquement à la première création du volume.
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d mmorpg_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
