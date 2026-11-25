@@ -20,7 +20,7 @@ Hors projet : voir `docs/rules.md` §1.
 | 1 | L1 Socle et identité | ARCH-01 à ARCH-04, ID-01 à ID-03 | Structure en couches validée, base prête, inscription et connexion | ✅ | a4deeb2 |
 | 2 | L2 Personnages | CHAR-01 à CHAR-04 | Créer et consulter ses personnages, statistiques et progression | ✅ | 9717d55 |
 | 3 | L3 Monde et combat | WORLD-01, COMBAT-01 à COMBAT-03 | Combat jouable jusqu'à la victoire ou la défaite | ✅ | 20db0d5 |
-| 4 | L4 Récompenses et livraison | REWARD-01, INV-01, DOC-01, QUAL-01 | Parcours complet, collection Postman, README | 👀 | — |
+| 4 | L4 Récompenses et livraison | REWARD-01, INV-01, DOC-01, QUAL-01 | Parcours complet, collection Postman, README | ✅ | 18f8130 |
 
 Chaque journée garde environ 1 h de marge. Décisions de chaque lot : `docs/lots/LN.md`.
 
@@ -178,7 +178,7 @@ Format : **Objectif**, **Critères** (3 à 5), **Tests**. Les exemples chiffrés
 ### Jour 4 — Récompenses et livraison
 
 #### REWARD-01 — Récompenses de victoire
-**Statut :** 👀 · **Dépend de :** COMBAT-03 · **Règles :** §7
+**Statut :** ✅ · **Dépend de :** COMBAT-03 · **Règles :** §7
 **Objectif :** à la victoire, XP et butin attribués **une seule fois**, dans la même transaction que l'action finale.
 **Critères :**
 - [x] Un seul `UnitOfWork` : action finale + `Character.gainExperience` + ajout à l'inventaire.
@@ -188,14 +188,14 @@ Format : **Objectif**, **Critères** (3 à 5), **Tests**. Les exemples chiffrés
 **Tests :** tirage forcé à 0,31 (objet) et 0,9 (rien), passage de niveau, panne injectée, deux actions simultanées.
 
 #### INV-01 — Inventaire
-**Statut :** 👀 · **Dépend de :** REWARD-01 · **Règles :** §10
+**Statut :** ✅ · **Dépend de :** REWARD-01 · **Règles :** §10
 **Objectif :** agrégat `Inventory` et `GET /api/v1/characters/:characterId/inventory`.
 **Critères :**
 - [x] Objets empilés par type (quantité), sans limite ; seulement pour le propriétaire (sinon 404 `CHARACTER_NOT_FOUND`).
 **Tests :** empilement, isolation entre joueurs.
 
 #### DOC-01 — Collection Postman et README
-**Statut :** 👀 · **Dépend de :** INV-01
+**Statut :** ✅ · **Dépend de :** INV-01
 **Objectif :** collection Postman du parcours de la section 1 (variables, tests de statut) et README à jour.
 **Critères :**
 - [x] Le Runner Postman exécute le parcours complet, victoire et défaite, sur une base fraîchement initialisée.
@@ -203,7 +203,7 @@ Format : **Objectif**, **Critères** (3 à 5), **Tests**. Les exemples chiffrés
 **Tests :** exécution du Runner.
 
 #### QUAL-01 — Revue finale
-**Statut :** 👀 · **Dépend de :** DOC-01
+**Statut :** ✅ · **Dépend de :** DOC-01
 **Objectif :** vérifier la qualité avant la livraison.
 **Critères :**
 - [x] `/verifier` entièrement au vert.

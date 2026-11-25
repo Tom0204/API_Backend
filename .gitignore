@@ -11,6 +11,22 @@ src/generated/
 .env.*
 !.env.example
 
+# Espace de travail local de Postman : seule la collection exportée est versionnée
+.postman/
+postman/*
+!postman/mmorpg-api.postman_collection.json
+
+# Outillage de l'agent IA (gardé en local, hors du dépôt) ; AGENTS.md reste versionné : il porte les règles du projet
+.claude/
+CLAUDE.md
+GUIDE.md
+.claude/settings.local.json
+
+# Éditeurs et système
+.vscode/
+.idea/
+Thumbs.db
+
 # Divers
 *.log
 .DS_Store
