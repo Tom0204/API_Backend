@@ -7,6 +7,9 @@ import type { CheckHealth } from '../health/check-health'
 import type { Authenticate } from '../../contexts/identity/app/use-cases/authenticate'
 import type { GetCurrentAccount } from '../../contexts/identity/app/use-cases/get-current-account'
 import type { Login } from '../../contexts/identity/app/use-cases/login'
+import type { Logout } from '../../contexts/identity/app/use-cases/logout'
+import type { LogoutAll } from '../../contexts/identity/app/use-cases/logout-all'
+import type { RefreshSession } from '../../contexts/identity/app/use-cases/refresh-session'
 import type { RegisterAccount } from '../../contexts/identity/app/use-cases/register-account'
 import type { GetMyInventory } from '../../contexts/inventory/app/use-cases/get-my-inventory'
 import type { ListZoneMonsters } from '../../contexts/world/app/use-cases/list-zone-monsters'
@@ -30,6 +33,9 @@ export interface UseCases extends CharacterUseCases, CombatUseCases {
     checkHealth: CheckHealth
     registerAccount: RegisterAccount
     login: Login
+    refreshSession: RefreshSession
+    logout: Logout
+    logoutAll: LogoutAll
     authenticate: Authenticate
     getCurrentAccount: GetCurrentAccount
     listClasses: ListClasses

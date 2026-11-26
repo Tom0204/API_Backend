@@ -8,17 +8,14 @@ import type { AccountRepository } from '../interfaces/account-repository'
 import type { PasswordHasher } from '../interfaces/password-hasher'
 import type { SessionRepository } from '../interfaces/session-repository'
 import type { TokenGenerator } from '../interfaces/token-generator'
+import { type SessionTokensOutput, toSessionTokensOutput } from '../utils/session-tokens-output'
 
 export interface LoginInput {
     email: string
     password: string
 }
 
-export interface LoginOutput {
-    /** Jeton en clair : renvoyé une seule fois, jamais stocké ni journalisé. */
-    token: string
-    expiresAt: Date
-}
+export type LoginOutput = SessionTokensOutput
 
 type Transaction = { accounts: AccountRepository; sessions: SessionRepository }
 
@@ -59,21 +56,39 @@ export function createLogin({
             const email = Email.create(input.email)
             const account = await unitOfWork.run(({ accounts }) => accounts.findByEmail(email))
 
-            // D7 : un email inconnu coûte une vérification Argon2, comme un mauvais mot de passe.
+            // L1 D7 : un email inconnu coûte une vérification Argon2, comme un mauvais mot de passe.
+            // L6 D6 : la vérification a lieu même si le compte est verrouillé, hors de toute transaction.
             const passwordHash = await hashToVerify(account)
             const passwordMatches = await passwordHasher.verify(passwordHash, input.password)
+            if (!account) throw identityErrors.invalidCredentials()
 
-            if (!account || !passwordMatches) {
-                throw identityErrors.invalidCredentials()
-            }
+            const accessToken = tokenGenerator.generate()
+            const refreshToken = tokenGenerator.generate()
 
-            const token = tokenGenerator.generate()
-            const session = await unitOfWork.run(({ sessions }) =>
-                sessions.insert(
-                    Session.open({ accountId: account.id, tokenHash: tokenGenerator.hash(token), now: clock.now() })
+            // Verrou sur le compte : des échecs simultanés sont tous comptés (AUTH-03). Un échec renvoie `undefined`
+            // au lieu de lever une erreur, pour que le compteur soit validé avec la transaction.
+            const output = await unitOfWork.run(async ({ accounts, sessions }) => {
+                const locked = await accounts.findByIdForUpdate(account.id)
+                if (!locked) return undefined
+                const now = clock.now()
+                const accepted = locked.attemptLogin(passwordMatches, now)
+                await accounts.save(locked)
+                if (!accepted) return undefined
+
+                const session = await sessions.insert(
+                    Session.open({
+                        accountId: locked.id,
+                        accessTokenHash: tokenGenerator.hash(accessToken),
+                        refreshTokenHash: tokenGenerator.hash(refreshToken),
+                        now
+                    })
                 )
-            )
-            return { token, expiresAt: session.snapshot.expiresAt }
+                return toSessionTokensOutput(session, { accessToken, refreshToken })
+            })
+
+            // Mauvais mot de passe, compte verrouillé ou supprimé entre-temps : même réponse qu'un email inconnu.
+            if (!output) throw identityErrors.invalidCredentials()
+            return output
         }
     }
 }

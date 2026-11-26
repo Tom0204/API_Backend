@@ -11,6 +11,9 @@ import { createListZoneMonsters } from './contexts/world/app/use-cases/list-zone
 import { createAuthenticate } from './contexts/identity/app/use-cases/authenticate'
 import { createGetCurrentAccount } from './contexts/identity/app/use-cases/get-current-account'
 import { createLogin } from './contexts/identity/app/use-cases/login'
+import { createLogout } from './contexts/identity/app/use-cases/logout'
+import { createLogoutAll } from './contexts/identity/app/use-cases/logout-all'
+import { createRefreshSession } from './contexts/identity/app/use-cases/refresh-session'
 import { createRegisterAccount } from './contexts/identity/app/use-cases/register-account'
 import { createGetMyInventory } from './contexts/inventory/app/use-cases/get-my-inventory'
 import { loadEnvironment } from './config/environment'
@@ -51,6 +54,9 @@ async function main(): Promise<void> {
             checkHealth: createCheckHealth(),
             registerAccount: createRegisterAccount({ unitOfWork, passwordHasher }),
             login: createLogin({ unitOfWork, passwordHasher, tokenGenerator, clock }),
+            refreshSession: createRefreshSession({ unitOfWork, tokenGenerator, clock }),
+            logout: createLogout({ unitOfWork, clock }),
+            logoutAll: createLogoutAll({ unitOfWork, clock }),
             authenticate: createAuthenticate({ unitOfWork, tokenGenerator, clock }),
             getCurrentAccount: createGetCurrentAccount({ unitOfWork }),
             listClasses: createListClasses({ unitOfWork }),

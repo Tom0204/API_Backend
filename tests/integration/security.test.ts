@@ -139,7 +139,7 @@ describe('X-Request-Id et logs', () => {
         await request(app)
             .get('/api/v1/auth/me')
             .set('X-Request-Id', 'req-me')
-            .set('Authorization', `Bearer ${login.body.data.token}`)
+            .set('Authorization', `Bearer ${login.body.data.accessToken}`)
 
         const logs = logLines.join('\n')
         const entries = logLines.map((line) => JSON.parse(line))
@@ -152,7 +152,7 @@ describe('X-Request-Id et logs', () => {
             responseTime: expect.any(Number)
         })
         expect(entries.find((entry) => entry.req?.id === 'req-register')?.route).toBe('/api/v1/auth/register')
-        for (const secret of [VALID_PASSWORD, login.body.data.token, 'logged@example.com', 'secret-query-value', 'Bearer']) {
+        for (const secret of [VALID_PASSWORD, login.body.data.accessToken, 'logged@example.com', 'secret-query-value', 'Bearer']) {
             expect(logs).not.toContain(secret)
         }
     })

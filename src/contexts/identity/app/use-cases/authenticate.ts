@@ -1,4 +1,4 @@
-import type { AuthContext } from '../../../../shared/app/auth-context'
+import type { SessionAuthContext } from '../../../../shared/app/auth-context'
 import type { Clock } from '../../../../shared/app/clock'
 import type { UnitOfWork } from '../../../../shared/app/unit-of-work'
 import { identityErrors } from '../../domain/identity-errors'
@@ -17,15 +17,15 @@ export function createAuthenticate({
     clock: Clock
 }) {
     return {
-        /** Jeton inconnu ou expiré : même erreur `UNAUTHENTICATED`. */
-        execute: async (token: string): Promise<AuthContext> => {
-            const tokenHash = tokenGenerator.hash(token)
-            const session = await unitOfWork.run(({ sessions }) => sessions.findByTokenHash(tokenHash))
+        /** Jeton d'accès inconnu, remplacé par une rotation, expiré ou de session révoquée : même `UNAUTHENTICATED`. */
+        execute: async (accessToken: string): Promise<SessionAuthContext> => {
+            const accessTokenHash = tokenGenerator.hash(accessToken)
+            const session = await unitOfWork.run(({ sessions }) => sessions.findByAccessTokenHash(accessTokenHash))
 
-            if (!session || session.isExpiredAt(clock.now())) {
+            if (!session?.acceptsAccessAt(clock.now())) {
                 throw identityErrors.unauthenticated()
             }
-            return { accountId: session.snapshot.accountId }
+            return { accountId: session.snapshot.accountId, sessionId: session.id }
         }
     }
 }

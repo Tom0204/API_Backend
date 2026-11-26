@@ -9,7 +9,7 @@ async function setup() {
     const auth = (token: string) => ({ Authorization: `Bearer ${token}` })
     const player = async (email: string, name: string, classCode = 'warrior') => {
         await request(app).post('/api/v1/auth/register').send({ email, password: VALID_PASSWORD })
-        const token: string = (await request(app).post('/api/v1/auth/login').send({ email, password: VALID_PASSWORD })).body.data.token
+        const token: string = (await request(app).post('/api/v1/auth/login').send({ email, password: VALID_PASSWORD })).body.data.accessToken
         const character = await request(app).post('/api/v1/characters').set(auth(token)).send({ name, classId: database.classId(classCode) })
         return { token, characterId: character.body.data.id as string }
     }

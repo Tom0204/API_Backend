@@ -9,7 +9,7 @@ type App = ReturnType<typeof buildTestApp>['app']
 async function tokenFor(app: App, email: string): Promise<string> {
     await request(app).post('/api/v1/auth/register').send({ email, password: VALID_PASSWORD })
     const response = await request(app).post('/api/v1/auth/login').send({ email, password: VALID_PASSWORD })
-    return response.body.data.token
+    return response.body.data.accessToken
 }
 
 function setup() {

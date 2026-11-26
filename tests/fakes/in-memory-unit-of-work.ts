@@ -18,6 +18,7 @@ import { Account } from '../../src/contexts/identity/domain/account'
 import type { AccountRepository } from '../../src/contexts/identity/app/interfaces/account-repository'
 import { Email } from '../../src/contexts/identity/domain/email'
 import { identityErrors } from '../../src/contexts/identity/domain/identity-errors'
+import { RefreshToken } from '../../src/contexts/identity/domain/refresh-token'
 import { Session } from '../../src/contexts/identity/domain/session'
 import type { SessionRepository } from '../../src/contexts/identity/app/interfaces/session-repository'
 import { Inventory } from '../../src/contexts/inventory/domain/inventory'
@@ -37,14 +38,25 @@ interface AccountRecord {
     id: string
     email: string
     passwordHash: string
+    failedLoginCount: number
+    lockedUntil: Date | null
     createdAt: Date
 }
 
 interface SessionRecord {
     id: string
     accountId: string
-    tokenHash: string
+    accessTokenHash: string
+    accessExpiresAt: Date
     expiresAt: Date
+    revokedAt: Date | null
+}
+
+interface RefreshTokenRecord {
+    id: string
+    sessionId: string
+    tokenHash: string
+    usedAt: Date | null
 }
 
 interface CharacterClassRecord {
@@ -94,6 +106,7 @@ interface CombatRecord {
 export interface InMemoryState {
     accounts: AccountRecord[]
     sessions: SessionRecord[]
+    refreshTokens: RefreshTokenRecord[]
     classes: CharacterClassRecord[]
     characters: CharacterRecord[]
     zones: ZoneProps[]
@@ -133,6 +146,7 @@ export class InMemoryDatabase implements UnitOfWork<AppTransaction> {
     state: InMemoryState = {
         accounts: [],
         sessions: [],
+        refreshTokens: [],
         classes: CHARACTER_CLASSES.map((characterClass) => ({
             id: randomUUID(),
             code: characterClass.code,
@@ -352,6 +366,8 @@ function createInventoryRepository(draft: InMemoryState): InventoryRepository {
 function createAccountRepository(draft: InMemoryState): AccountRepository {
     return {
         findById: async (id) => toAccount(draft.accounts.find((record) => record.id === id)),
+        // Les unités de travail sont déjà exécutées l'une après l'autre : équivalent du verrou sur le compte.
+        findByIdForUpdate: async (id) => toAccount(draft.accounts.find((record) => record.id === id)),
         findByEmail: async (email) => toAccount(draft.accounts.find((record) => record.email === email.value)),
         insert: async (account) => {
             if (draft.accounts.some((record) => record.email === account.email.value)) {
@@ -361,27 +377,86 @@ function createAccountRepository(draft: InMemoryState): AccountRepository {
                 id: randomUUID(),
                 email: account.email.value,
                 passwordHash: account.passwordHash,
+                failedLoginCount: 0,
+                lockedUntil: null,
                 createdAt: new Date()
             }
             draft.accounts.push(record)
             return Account.restore({ ...record, email: Email.create(record.email) })
+        },
+        save: async (account) => {
+            const { id, failedLoginCount, lockedUntil } = account.snapshot
+            const record = draft.accounts.find((candidate) => candidate.id === id)
+            if (!record) throw new Error('Compte inexistant')
+            if (failedLoginCount < 0) throw new Error('Contrainte CHECK violée : compteur négatif')
+            Object.assign(record, { failedLoginCount, lockedUntil })
         }
     }
 }
 
 function createSessionRepository(draft: InMemoryState): SessionRepository {
+    const findRecord = (id: string) => draft.sessions.find((session) => session.id === id)
+    const restore = (record: SessionRecord) => Session.restore({ ...record })
+    const assertUnique = (field: 'accessTokenHash', value: string, exceptId?: string) => {
+        if (draft.sessions.some((session) => session[field] === value && session.id !== exceptId)) {
+            throw new Error('Index unique violé : empreinte du jeton d’accès')
+        }
+    }
+    const addRefreshToken = (sessionId: string, tokenHash: string) => {
+        if (draft.refreshTokens.some((token) => token.tokenHash === tokenHash)) {
+            throw new Error('Index unique violé : empreinte du jeton de rafraîchissement')
+        }
+        draft.refreshTokens.push({ id: randomUUID(), sessionId, tokenHash, usedAt: null })
+    }
+
     return {
-        findByTokenHash: async (tokenHash) => {
-            const record = draft.sessions.find((session) => session.tokenHash === tokenHash)
-            return record ? Session.restore({ ...record }) : undefined
+        findByAccessTokenHash: async (accessTokenHash) => {
+            const record = draft.sessions.find((session) => session.accessTokenHash === accessTokenHash)
+            return record ? restore(record) : undefined
         },
-        insert: async (session) => {
+        // Les unités de travail sont déjà exécutées l'une après l'autre : équivalent des verrous.
+        findByIdForUpdate: async (id) => {
+            const record = findRecord(id)
+            return record ? restore(record) : undefined
+        },
+        findByRefreshTokenHashForUpdate: async (refreshTokenHash) => {
+            const token = draft.refreshTokens.find((candidate) => candidate.tokenHash === refreshTokenHash)
+            const session = token && findRecord(token.sessionId)
+            if (!token || !session) return undefined
+            return { session: restore(session), refreshToken: RefreshToken.restore({ ...token }) }
+        },
+        insert: async ({ refreshTokenHash, ...session }) => {
             if (!draft.accounts.some((account) => account.id === session.accountId)) {
                 throw new Error('Clé étrangère violée : compte inexistant') // équivalent de la contrainte
             }
-            const record = { id: randomUUID(), ...session }
+            if (session.accessExpiresAt.getTime() > session.expiresAt.getTime()) {
+                throw new Error('Contrainte CHECK violée : sessions_access_within_family')
+            }
+            assertUnique('accessTokenHash', session.accessTokenHash)
+            const record: SessionRecord = { id: randomUUID(), ...session }
             draft.sessions.push(record)
-            return Session.restore({ ...record })
+            addRefreshToken(record.id, refreshTokenHash)
+            return restore(record)
+        },
+        save: async (session) => {
+            const { id, accessTokenHash, accessExpiresAt, revokedAt } = session.snapshot
+            const { usedRefreshTokenIds, newRefreshTokenHashes, usedAt } = session.changes
+            const record = findRecord(id)
+            if (!record) throw new Error('Session inexistante')
+            if (accessExpiresAt.getTime() > record.expiresAt.getTime()) {
+                throw new Error('Contrainte CHECK violée : sessions_access_within_family')
+            }
+            assertUnique('accessTokenHash', accessTokenHash, id)
+            Object.assign(record, { accessTokenHash, accessExpiresAt, revokedAt })
+            for (const token of draft.refreshTokens) {
+                if (token.sessionId === id && usedRefreshTokenIds.includes(token.id)) token.usedAt = usedAt
+            }
+            for (const tokenHash of newRefreshTokenHashes) addRefreshToken(id, tokenHash)
+        },
+        revokeAllByAccount: async (accountId, now) => {
+            const active = draft.sessions.filter((session) => session.accountId === accountId && session.revokedAt === null)
+            for (const session of active) session.revokedAt = now
+            return active.length
         }
     }
 }

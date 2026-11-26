@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type { AppTransaction } from '../../src/platform/transaction'
 import type { UnitOfWork } from '../../src/shared/app/unit-of-work'
-import { Account } from '../../src/contexts/identity/domain/account'
+import { Account, LOGIN_LOCK_DURATION_MS, MAX_FAILED_LOGIN_ATTEMPTS } from '../../src/contexts/identity/domain/account'
 import { Email } from '../../src/contexts/identity/domain/email'
 import { Session } from '../../src/contexts/identity/domain/session'
 
@@ -14,6 +14,7 @@ export interface ContractContext {
 
 /** Même contrat pour les repositories en mémoire et Prisma (AGENTS.md §6), à travers le `UnitOfWork`. */
 export function describeIdentityRepositoryContract(name: string, getContext: () => ContractContext) {
+    const NOW = new Date('2026-11-25T10:00:00.000Z')
     const tokenHash = () => randomUUID().replaceAll('-', '').padEnd(64, '0')
 
     describe(`contrat des repositories identity — ${name}`, () => {
@@ -78,21 +79,96 @@ export function describeIdentityRepositoryContract(name: string, getContext: () 
             expect(await unitOfWork.run(({ accounts }) => accounts.findByEmail(email))).toBeUndefined()
         })
 
-        it("insère une session et la retrouve par l'empreinte du jeton", async () => {
-            const { unitOfWork, uniqueEmail } = getContext()
-            const hash = tokenHash()
-
+        async function insertAccountWithSession(context: ContractContext) {
+            const { unitOfWork, uniqueEmail } = context
+            const hashes = { accessTokenHash: tokenHash(), refreshTokenHash: tokenHash() }
             const session = await unitOfWork.run(async ({ accounts, sessions }) => {
                 const account = await accounts.insert(Account.create({ email: uniqueEmail(), passwordHash: 'hash' }))
-                return sessions.insert(
-                    Session.open({ accountId: account.id, tokenHash: hash, now: new Date('2026-11-25T10:00:00.000Z') })
-                )
+                return sessions.insert(Session.open({ accountId: account.id, ...hashes, now: NOW }))
             })
-            const found = await unitOfWork.run(({ sessions }) => sessions.findByTokenHash(hash))
+            return { session, ...hashes }
+        }
+
+        it("insère une session et la retrouve par l'empreinte du jeton d'accès", async () => {
+            const { unitOfWork } = getContext()
+
+            const { session, accessTokenHash } = await insertAccountWithSession(getContext())
+            const found = await unitOfWork.run(({ sessions }) => sessions.findByAccessTokenHash(accessTokenHash))
 
             expect(found?.snapshot).toEqual(session.snapshot)
-            expect(found?.snapshot.expiresAt.toISOString()).toBe('2026-11-26T10:00:00.000Z')
-            expect(await unitOfWork.run(({ sessions }) => sessions.findByTokenHash(tokenHash()))).toBeUndefined()
+            expect(session.snapshot).toMatchObject({
+                accessExpiresAt: new Date('2026-11-25T10:15:00.000Z'),
+                expiresAt: new Date('2026-12-02T10:00:00.000Z'),
+                revokedAt: null
+            })
+            expect(await unitOfWork.run(({ sessions }) => sessions.findByAccessTokenHash(tokenHash()))).toBeUndefined()
+            expect(await unitOfWork.run(({ sessions }) => sessions.findByIdForUpdate(session.id))).toBeDefined()
+            expect(await unitOfWork.run(({ sessions }) => sessions.findByIdForUpdate(randomUUID()))).toBeUndefined()
+        })
+
+        it('retrouve la session par son premier jeton de rafraîchissement, non utilisé', async () => {
+            const { unitOfWork } = getContext()
+            const { session, refreshTokenHash } = await insertAccountWithSession(getContext())
+
+            const found = await unitOfWork.run(({ sessions }) => sessions.findByRefreshTokenHashForUpdate(refreshTokenHash))
+
+            expect(found?.session.snapshot).toEqual(session.snapshot)
+            expect(found?.refreshToken.snapshot).toMatchObject({ sessionId: session.id, tokenHash: refreshTokenHash, usedAt: null })
+            expect(
+                await unitOfWork.run(({ sessions }) => sessions.findByRefreshTokenHashForUpdate(tokenHash()))
+            ).toBeUndefined()
+        })
+
+        it('enregistre une rotation : nouveau jeton d’accès, ancien jeton consommé, nouveau jeton émis', async () => {
+            const { unitOfWork } = getContext()
+            const { session, accessTokenHash, refreshTokenHash } = await insertAccountWithSession(getContext())
+            const next = { accessTokenHash: tokenHash(), refreshTokenHash: tokenHash() }
+            const later = new Date(NOW.getTime() + 60_000)
+
+            await unitOfWork.run(async ({ sessions }) => {
+                const found = await sessions.findByRefreshTokenHashForUpdate(refreshTokenHash)
+                if (!found) throw new Error('session introuvable')
+                found.session.rotate(found.refreshToken, next, later)
+                await sessions.save(found.session)
+            })
+
+            const old = await unitOfWork.run(({ sessions }) => sessions.findByRefreshTokenHashForUpdate(refreshTokenHash))
+            const fresh = await unitOfWork.run(({ sessions }) => sessions.findByRefreshTokenHashForUpdate(next.refreshTokenHash))
+            expect(old?.refreshToken.snapshot.usedAt).toEqual(later)
+            expect(fresh?.refreshToken.snapshot.usedAt).toBeNull()
+            expect(fresh?.session.snapshot).toMatchObject({
+                id: session.id,
+                accessTokenHash: next.accessTokenHash,
+                accessExpiresAt: new Date('2026-11-25T10:16:00.000Z')
+            })
+            expect(await unitOfWork.run(({ sessions }) => sessions.findByAccessTokenHash(accessTokenHash))).toBeUndefined()
+        })
+
+        it('enregistre une révocation ; revokeAllByAccount ne révoque que les sessions actives du compte', async () => {
+            const { unitOfWork } = getContext()
+            const first = await insertAccountWithSession(getContext())
+            const other = await insertAccountWithSession(getContext())
+            const accountId = first.session.snapshot.accountId
+            const second = await unitOfWork.run(({ sessions }) =>
+                sessions.insert(Session.open({ accountId, accessTokenHash: tokenHash(), refreshTokenHash: tokenHash(), now: NOW }))
+            )
+            const revokedAt = new Date(NOW.getTime() + 1000)
+
+            await unitOfWork.run(async ({ sessions }) => {
+                const session = await sessions.findByIdForUpdate(first.session.id)
+                if (!session) throw new Error('session introuvable')
+                session.revoke(revokedAt)
+                await sessions.save(session)
+            })
+            const count = await unitOfWork.run(({ sessions }) =>
+                sessions.revokeAllByAccount(accountId, new Date(NOW.getTime() + 2000))
+            )
+
+            const read = (id: string) => unitOfWork.run(({ sessions }) => sessions.findByIdForUpdate(id))
+            expect(count).toBe(1)
+            expect((await read(first.session.id))?.snapshot.revokedAt).toEqual(revokedAt)
+            expect((await read(second.id))?.snapshot.revokedAt).toEqual(new Date(NOW.getTime() + 2000))
+            expect((await read(other.session.id))?.snapshot.revokedAt).toBeNull()
         })
 
         it("refuse une session d'un compte inexistant", async () => {
@@ -100,9 +176,33 @@ export function describeIdentityRepositoryContract(name: string, getContext: () 
 
             await expect(
                 unitOfWork.run(({ sessions }) =>
-                    sessions.insert(Session.open({ accountId: randomUUID(), tokenHash: tokenHash(), now: new Date() }))
+                    sessions.insert(
+                        Session.open({ accountId: randomUUID(), accessTokenHash: tokenHash(), refreshTokenHash: tokenHash(), now: NOW })
+                    )
                 )
             ).rejects.toThrow()
+        })
+
+        it('enregistre le compteur d’échecs et le verrouillage du compte', async () => {
+            const { unitOfWork, uniqueEmail } = getContext()
+            const inserted = await unitOfWork.run(({ accounts }) =>
+                accounts.insert(Account.create({ email: uniqueEmail(), passwordHash: 'hash' }))
+            )
+            expect(inserted.snapshot).toMatchObject({ failedLoginCount: 0, lockedUntil: null })
+
+            await unitOfWork.run(async ({ accounts }) => {
+                const account = await accounts.findByIdForUpdate(inserted.id)
+                if (!account) throw new Error('compte introuvable')
+                for (let i = 0; i < MAX_FAILED_LOGIN_ATTEMPTS; i += 1) account.attemptLogin(false, NOW)
+                await accounts.save(account)
+            })
+
+            const saved = await unitOfWork.run(({ accounts }) => accounts.findById(inserted.id))
+            expect(saved?.snapshot).toMatchObject({
+                failedLoginCount: MAX_FAILED_LOGIN_ATTEMPTS,
+                lockedUntil: new Date(NOW.getTime() + LOGIN_LOCK_DURATION_MS)
+            })
+            expect(await unitOfWork.run(({ accounts }) => accounts.findByIdForUpdate(randomUUID()))).toBeUndefined()
         })
     })
 }

@@ -67,7 +67,7 @@ qui possède la donnée le fournit par un service. Règle vérifiée par `tests/
 
 | Contexte | Rôle |
 |---|---|
-| `identity` | Comptes, sessions opaques de 24 h, authentification |
+| `identity` | Comptes, jetons d’accès et de rafraîchissement, déconnexion, verrouillage après échecs |
 | `characters` | Classes, personnages, statistiques calculées, progression (XP, niveaux) |
 | `world` | Zones et modèles de monstres, avec leur butin |
 | `combat` | Combat tour par tour ; la victoire publie `CombatWon`, qui déclenche XP et butin dans la même transaction |

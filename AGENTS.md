@@ -50,7 +50,7 @@ aucun hash de commit, aucun nombre de tests. L'état réel se lit dans `Backlog.
 | Langage | Node.js 22, TypeScript strict, ESM ; build CommonJS par tsup |
 | HTTP | Express 4, Zod 4, Helmet, cors, express-rate-limit |
 | Base | PostgreSQL 18 (Docker Compose), Prisma 7 + `@prisma/adapter-pg`, identifiants UUID v7 générés par PostgreSQL |
-| Authentification | Session opaque (32 octets aléatoires, empreinte SHA-256 en base, 24 h), jeton `Bearer` ; mots de passe en Argon2id |
+| Authentification | Jetons opaques (32 octets aléatoires, empreintes SHA-256 en base) : accès court en `Bearer`, rafraîchissement à usage unique avec rotation ; durées et seuil de verrouillage dans le domaine `identity` ; mots de passe en Argon2id |
 | Logs | Pino, pino-http |
 | Tests | Vitest, Supertest ; validation manuelle avec Postman |
 | Configuration | `src/config/environment.ts`, `.env` chargé par `process.loadEnvFile()` (pas de dotenv) |

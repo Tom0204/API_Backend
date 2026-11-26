@@ -1,9 +1,9 @@
-# Backlog — API MMORPG (4 jours)
+# Backlog — API MMORPG (8 jours)
 
-> **19 tickets** en 4 lots, un par jour. Objectif : un parcours jouable complet, propre et testé.
+> **32 tickets** en 8 lots, un par jour. Objectif : un parcours jouable complet, propre et testé.
 > Le statut de chaque ticket est tenu **ici et seulement ici**.
 > Règles : `docs/rules.md` · Architecture : `docs/architecture.md` · Contrat HTTP : `docs/conventions.md`.
-> Légende : ⏳ à faire · 🔄 en cours · 👀 en attente de validation · ✅ validé · ⏸ hors projet
+> Légende : ⏳ à faire · ✅ validé · ⏸ hors projet
 
 ## 1. Définition de « terminé »
 
@@ -21,6 +21,10 @@ Hors projet : voir `docs/rules.md` §1.
 | 2 | L2 Personnages | CHAR-01 à CHAR-04 | Créer et consulter ses personnages, statistiques et progression | ✅ | 9717d55 |
 | 3 | L3 Monde et combat | WORLD-01, COMBAT-01 à COMBAT-03 | Combat jouable jusqu'à la victoire ou la défaite | ✅ | 20db0d5 |
 | 4 | L4 Récompenses et livraison | REWARD-01, INV-01, DOC-01, QUAL-01 | Parcours complet, collection Postman, README | ✅ | 18f8130 |
+| 5 | L5 Événements de domaine | EVT-01 à EVT-03 | Événements de combats et journal en jeu | ✅ | 80861ea |
+| 6 | L6 Renforcement de l'authentification | AUTH-01 à AUTH-03 | Jetons d'accès et de rafraîchissement, déconnexion, verrouillage après échecs de connexion | ✅ | - |
+| 7 | L7 Rôles et administration | ROLE-01 à ROLE-03 | Permissions, contrôle centralisé et administration des comptes | ⏳ | - |
+| 8 | L8 Produit et documentation | PROD-01, PROD-02, DOC-02, QUAL-02 | Historique d'un combat, classement des personnages, documentation et revue | ⏳ | - |
 
 Chaque journée garde environ 1 h de marge. Décisions de chaque lot : `docs/lots/LN.md`.
 
@@ -245,30 +249,30 @@ Format : **Objectif**, **Critères** (3 à 5), **Tests**. Les exemples chiffrés
 ### Jour 6 — Authentification renforcée
 
 #### AUTH-01 — Jeton d'accès et jeton de rafraîchissement
-**Statut :** ⏳ · **Dépend de :** ID-03
+**Statut :** ✅ · **Dépend de :** ID-03
 **Objectif :** jeton d'accès court et jeton de rafraîchissement à usage unique, `POST /api/v1/auth/refresh`.
 **Critères :**
-- [ ] La connexion renvoie les deux jetons ; seules leurs empreintes sont stockées ; durées en paramètres.
-- [ ] Rotation : un rafraîchissement invalide l'ancien jeton et en émet un nouveau, dans une transaction verrouillée.
-- [ ] Réutilisation d'un jeton déjà utilisé → toute la famille de sessions est révoquée, 401.
-- [ ] Jeton d'accès expiré → 401 `UNAUTHENTICATED` ; `/auth/me` inchangé.
+- [x] La connexion renvoie les deux jetons ; seules leurs empreintes sont stockées ; durées en paramètres.
+- [x] Rotation : un rafraîchissement invalide l'ancien jeton et en émet un nouveau, dans une transaction verrouillée.
+- [x] Réutilisation d'un jeton déjà utilisé → toute la famille de sessions est révoquée, 401.
+- [x] Jeton d'accès expiré → 401 `UNAUTHENTICATED` ; `/auth/me` inchangé.
 **Tests :** rotation, réutilisation, expiration (horloge de test) ; PostgreSQL : 2 rafraîchissements simultanés → 1 seul succès.
 
 #### AUTH-02 — Déconnexion
-**Statut :** ⏳ · **Dépend de :** AUTH-01
-**Objectif :** `POST /api/v1/auth/logout` (204) révoque la session courante ; déconnexion de toutes les sessions du compte. Reprend BONUS-01.
+**Statut :** ✅ · **Dépend de :** AUTH-01
+**Objectif :** `POST /api/v1/auth/logout` (204) révoque la session courante ; déconnexion de toutes les sessions du compte.
 **Critères :**
-- [ ] Après déconnexion, le jeton d'accès et le jeton de rafraîchissement → 401.
-- [ ] La déconnexion simple laisse les autres sessions actives ; 204 sans corps.
+- [x] Après déconnexion, le jeton d'accès et le jeton de rafraîchissement → 401.
+- [x] La déconnexion simple laisse les autres sessions actives ; 204 sans corps.
 **Tests :** les deux déconnexions, isolation entre sessions.
 
 #### AUTH-03 — Verrouillage après échecs de connexion
-**Statut :** ⏳ · **Dépend de :** AUTH-01
+**Statut :** ✅ · **Dépend de :** AUTH-01
 **Objectif :** verrouiller temporairement un compte après plusieurs échecs consécutifs, en plus de la limite par IP.
 **Critères :**
-- [ ] Seuil et durée en paramètres ; une connexion réussie remet le compteur à zéro.
-- [ ] Aucune énumération des comptes : même réponse pour un email inconnu.
-- [ ] Échecs comptés même lors de connexions simultanées.
+- [x] Seuil et durée en paramètres ; une connexion réussie remet le compteur à zéro.
+- [x] Aucune énumération des comptes : même réponse pour un email inconnu.
+- [x] Échecs comptés même lors de connexions simultanées.
 **Tests :** seuil, déverrouillage par l'horloge, remise à zéro ; PostgreSQL : échecs simultanés.
 
 ### Jour 7 — Rôles et administration

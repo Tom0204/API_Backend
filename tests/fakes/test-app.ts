@@ -13,6 +13,9 @@ import { createListZoneMonsters } from '../../src/contexts/world/app/use-cases/l
 import { createAuthenticate } from '../../src/contexts/identity/app/use-cases/authenticate'
 import { createGetCurrentAccount } from '../../src/contexts/identity/app/use-cases/get-current-account'
 import { createLogin } from '../../src/contexts/identity/app/use-cases/login'
+import { createLogout } from '../../src/contexts/identity/app/use-cases/logout'
+import { createLogoutAll } from '../../src/contexts/identity/app/use-cases/logout-all'
+import { createRefreshSession } from '../../src/contexts/identity/app/use-cases/refresh-session'
 import { createRegisterAccount } from '../../src/contexts/identity/app/use-cases/register-account'
 import { createGetMyInventory } from '../../src/contexts/inventory/app/use-cases/get-my-inventory'
 import { type AppOptions, createApp } from '../../src/platform/http/app'
@@ -44,6 +47,9 @@ export function buildTestApp(overrides: Partial<Omit<AppOptions, 'logger'>> = {}
             checkHealth: createCheckHealth(),
             registerAccount: createRegisterAccount(deps),
             login: createLogin(deps),
+            refreshSession: createRefreshSession(deps),
+            logout: createLogout(deps),
+            logoutAll: createLogoutAll(deps),
             authenticate: createAuthenticate(deps),
             getCurrentAccount: createGetCurrentAccount(deps),
             listClasses: createListClasses(deps),

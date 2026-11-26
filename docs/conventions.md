@@ -6,8 +6,11 @@ collection Postman (`postman/`), mise à jour à chaque lot.
 ## 1. Routes
 
 - Toutes les routes métier sont sous `/api/v1`. `GET /health` est hors préfixe et non limité.
-- **Publiques :** `GET /health`, `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/classes`.
-  **Toutes les autres** exigent `Authorization: Bearer <jeton>` ; sinon 401 avec `WWW-Authenticate: Bearer realm="api"`.
+- **Publiques :** `GET /health`, `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`,
+  `GET /api/v1/classes`.
+  **Toutes les autres** exigent `Authorization: Bearer <jeton d’accès>` ; sinon 401 avec `WWW-Authenticate: Bearer realm="api"`.
+- Le jeton de rafraîchissement ne sert qu’à `POST /api/v1/auth/refresh` (corps `{ "refreshToken" }`), jamais en `Bearer`.
+  Jeton inconnu, expiré, révoqué ou déjà utilisé : même 401 `UNAUTHENTICATED`.
 
 | Élément | Convention | Exemple |
 |---|---|---|
@@ -85,7 +88,8 @@ Le domaine lève une `DomainError` avec un `kind` ; un seul middleware la tradui
 ## 7. Protections
 
 - Helmet, CORS selon `CORS_ORIGINS` (aucune origine externe en production si absente), JSON 10 Ko, contrôle du `Content-Type`.
-- Limitation : 300 requêtes par minute et par IP sur `/api/v1` ; 10 par 15 minutes sur `register` et `login`.
+- Limitation : 300 requêtes par minute et par IP sur `/api/v1` ; 10 par 15 minutes sur `register`, `login` et `refresh`
+  (chacun son compteur).
 - Logs : jamais de corps, paramètres, mots de passe, jetons, cookies ni URL de connexion.
 
 ## 8. Liste de contrôle d'un nouvel endpoint

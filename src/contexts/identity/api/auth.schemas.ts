@@ -14,6 +14,13 @@ export const registerBody = z.strictObject({
     password: z.string('Must be a string').refine(isAcceptablePassword, `Must be ${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters`)
 })
 
+/** Jeton opaque de 32 octets en base64url (43 caractères) ; borne large, le format exact n'est pas un secret. */
+export const refreshBody = z.strictObject({
+    refreshToken: z
+        .string('Must be a string')
+        .regex(/^[A-Za-z0-9_-]{1,512}$/, 'Must be a refresh token')
+})
+
 /** D4 : pas de minimum de 15 au login, pour qu'un changement de politique ne bloque aucun compte existant. */
 export const loginBody = z.strictObject({
     email,
