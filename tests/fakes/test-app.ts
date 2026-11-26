@@ -17,6 +17,10 @@ import { createLogout } from '../../src/contexts/identity/app/use-cases/logout'
 import { createLogoutAll } from '../../src/contexts/identity/app/use-cases/logout-all'
 import { createRefreshSession } from '../../src/contexts/identity/app/use-cases/refresh-session'
 import { createRegisterAccount } from '../../src/contexts/identity/app/use-cases/register-account'
+import { createChangeAccountRole } from '../../src/contexts/identity/app/use-cases/change-account-role'
+import { createListAccounts } from '../../src/contexts/identity/app/use-cases/list-accounts'
+import { createReactivateAccount } from '../../src/contexts/identity/app/use-cases/reactivate-account'
+import { createSuspendAccount } from '../../src/contexts/identity/app/use-cases/suspend-account'
 import { createGetMyInventory } from '../../src/contexts/inventory/app/use-cases/get-my-inventory'
 import { type AppOptions, createApp } from '../../src/platform/http/app'
 import { FakePasswordHasher, FakeTokenGenerator, FixedClock } from './fake-ports'
@@ -52,6 +56,10 @@ export function buildTestApp(overrides: Partial<Omit<AppOptions, 'logger'>> = {}
             logoutAll: createLogoutAll(deps),
             authenticate: createAuthenticate(deps),
             getCurrentAccount: createGetCurrentAccount(deps),
+            listAccounts: createListAccounts(deps),
+            suspendAccount: createSuspendAccount(deps),
+            reactivateAccount: createReactivateAccount(deps),
+            changeAccountRole: createChangeAccountRole(deps),
             listClasses: createListClasses(deps),
             createCharacter: createCreateCharacter({ ...deps, startingZoneId: IN_MEMORY_STARTING_ZONE_ID }),
             listMyCharacters: createListMyCharacters(deps),

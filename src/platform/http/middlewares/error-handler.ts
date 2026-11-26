@@ -7,6 +7,7 @@ import { RequestValidationError } from './validate'
 
 const STATUS_BY_KIND = {
     UNAUTHENTICATED: 401,
+    FORBIDDEN: 403,
     NOT_FOUND: 404,
     CONFLICT: 409,
     RULE_VIOLATION: 422

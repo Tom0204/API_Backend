@@ -16,15 +16,15 @@ export function presentInventory(items: InventoryItemOutput[]) {
 /** `GET /api/v1/characters/:characterId/inventory` : protégée, lecture seule. */
 export function createInventoryRoutes({
     getMyInventory,
-    requireAuth
+    requirePlayer
 }: {
     getMyInventory: GetMyInventory
-    requireAuth: RequestHandler
+    requirePlayer: RequestHandler
 }): Router {
     const router = Router()
     router.get(
         '/api/v1/characters/:characterId/inventory',
-        requireAuth,
+        requirePlayer,
         validate({ params: characterParams }),
         asyncHandler(async (req, res) => {
             const { characterId } = characterParams.parse(req.params) // déjà validé : typage sans transtypage

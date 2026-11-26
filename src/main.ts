@@ -15,6 +15,10 @@ import { createLogout } from './contexts/identity/app/use-cases/logout'
 import { createLogoutAll } from './contexts/identity/app/use-cases/logout-all'
 import { createRefreshSession } from './contexts/identity/app/use-cases/refresh-session'
 import { createRegisterAccount } from './contexts/identity/app/use-cases/register-account'
+import { createChangeAccountRole } from './contexts/identity/app/use-cases/change-account-role'
+import { createListAccounts } from './contexts/identity/app/use-cases/list-accounts'
+import { createReactivateAccount } from './contexts/identity/app/use-cases/reactivate-account'
+import { createSuspendAccount } from './contexts/identity/app/use-cases/suspend-account'
 import { createGetMyInventory } from './contexts/inventory/app/use-cases/get-my-inventory'
 import { loadEnvironment } from './config/environment'
 import { createLogger } from './platform/logging/logger'
@@ -59,6 +63,10 @@ async function main(): Promise<void> {
             logoutAll: createLogoutAll({ unitOfWork, clock }),
             authenticate: createAuthenticate({ unitOfWork, tokenGenerator, clock }),
             getCurrentAccount: createGetCurrentAccount({ unitOfWork }),
+            listAccounts: createListAccounts({ unitOfWork }),
+            suspendAccount: createSuspendAccount({ unitOfWork, clock }),
+            reactivateAccount: createReactivateAccount({ unitOfWork }),
+            changeAccountRole: createChangeAccountRole({ unitOfWork }),
             listClasses: createListClasses({ unitOfWork }),
             createCharacter: createCreateCharacter({ unitOfWork, startingZoneId, clock }),
             listMyCharacters: createListMyCharacters({ unitOfWork }),

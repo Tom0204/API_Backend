@@ -25,11 +25,12 @@ import { errorHandler } from './middlewares/error-handler'
 import { notFound } from './middlewares/not-found'
 import { createRateLimiter, DEFAULT_RATE_LIMITS, type RateLimitPolicy } from './middlewares/rate-limit'
 import { createRequestLogger } from './middlewares/request-logger'
-import { createRequireAuth } from '../../contexts/identity/api/require-auth'
+import { createAuthGuards } from '../../contexts/identity/api/require-auth'
+import { type AdminAccountUseCases, createAdminAccountRoutes } from '../../contexts/identity/api/admin-accounts.routes'
 import { createWorldRoutes } from '../../contexts/world/api/world.routes'
 
 /** Un cas d'usage par route ; construits par `main.ts`, ou sur `tests/fakes/` dans les tests HTTP. */
-export interface UseCases extends CharacterUseCases, CombatUseCases {
+export interface UseCases extends CharacterUseCases, CombatUseCases, AdminAccountUseCases {
     checkHealth: CheckHealth
     registerAccount: RegisterAccount
     login: Login
@@ -69,7 +70,9 @@ export function createApp(useCases: UseCases, options: AppOptions): Express {
     app.use(requireJsonContentType)
     app.use(express.json({ limit: JSON_BODY_LIMIT }))
 
-    const requireAuth = createRequireAuth(useCases.authenticate)
+    // ROLE-02 : une seule garde, construite sur `authenticate` ; les contextes de jeu reçoivent `requirePlayer`.
+    const { requireAuth, requirePermission } = createAuthGuards(useCases.authenticate)
+    const requirePlayer = requirePermission('PLAY')
     app.use(
         createAuthRoutes({
             ...useCases,
@@ -77,11 +80,12 @@ export function createApp(useCases: UseCases, options: AppOptions): Express {
             createAuthRateLimiter: () => createRateLimiter(rateLimits.auth)
         })
     )
+    app.use(createAdminAccountRoutes({ ...useCases, requirePermission }))
     app.use(createClassRoutes(useCases))
-    app.use(createCharacterRoutes({ ...useCases, requireAuth }))
-    app.use(createWorldRoutes({ ...useCases, requireAuth }))
-    app.use(createCombatRoutes({ ...useCases, requireAuth }))
-    app.use(createInventoryRoutes({ ...useCases, requireAuth }))
+    app.use(createCharacterRoutes({ ...useCases, requirePlayer }))
+    app.use(createWorldRoutes({ ...useCases, requirePlayer }))
+    app.use(createCombatRoutes({ ...useCases, requirePlayer }))
+    app.use(createInventoryRoutes({ ...useCases, requirePlayer }))
 
     app.use(notFound)
     app.use(errorHandler)

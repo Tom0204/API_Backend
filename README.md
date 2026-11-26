@@ -16,7 +16,7 @@ npm install
 Copy-Item .env.example .env   # puis choisir un mot de passe PostgreSQL
 npm run db:up                 # conteneur PostgreSQL (bases mmorpg_dev et mmorpg_test)
 npm run db:migrate            # migrations
-npm run db:seed               # données de référence (idempotent)
+npm run db:seed               # données de référence et premier administrateur (idempotent)
 npm run dev
 ```
 
@@ -30,8 +30,10 @@ inscription → connexion → personnage → statistiques → monstres de la zon
 Les emails et noms sont générés à chaque exécution : aucune remise à zéro de la base n'est nécessaire.
 
 - Variable `baseUrl` : `http://localhost:4001` par défaut.
+- Dossier L7 : renseigner les variables `adminEmail` et `adminPassword` avec `ADMIN_EMAIL` et `ADMIN_PASSWORD` du `.env`
+  (administrateur créé par `npm run db:seed`).
 - L'inscription et la connexion sont limitées chacune à 10 requêtes par 15 minutes et par IP (`docs/conventions.md` §7) :
-  une exécution complète en consomme 3 de chaque, la quatrième exécution en 15 minutes reçoit donc `429`.
+  une exécution complète consomme 3 inscriptions et 7 connexions, la deuxième exécution en 15 minutes reçoit donc `429`.
 
 ## Commandes
 
@@ -45,7 +47,7 @@ Les emails et noms sont générés à chaque exécution : aucune remise à zéro
 | `npm run test:db` | Tests PostgreSQL, sur `mmorpg_test` uniquement |
 | `npm run db:up` / `db:down` | Démarrer / arrêter PostgreSQL (les données sont conservées) |
 | `npm run db:migrate`, `db:status`, `db:generate` | Migrations et client Prisma |
-| `npm run db:seed` | Données de référence |
+| `npm run db:seed` | Données de référence ; administrateur si `ADMIN_EMAIL` et `ADMIN_PASSWORD` sont définis |
 | `npm run db:reset` | **Destructif** : efface la base de développement |
 
 ## Architecture
@@ -67,7 +69,7 @@ qui possède la donnée le fournit par un service. Règle vérifiée par `tests/
 
 | Contexte | Rôle |
 |---|---|
-| `identity` | Comptes, jetons d’accès et de rafraîchissement, déconnexion, verrouillage après échecs |
+| `identity` | Comptes, jetons d’accès et de rafraîchissement, déconnexion, verrouillage après échecs, permissions et administration des comptes |
 | `characters` | Classes, personnages, statistiques calculées, progression (XP, niveaux) |
 | `world` | Zones et modèles de monstres, avec leur butin |
 | `combat` | Combat tour par tour ; la victoire publie `CombatWon`, qui déclenche XP et butin dans la même transaction |
@@ -77,4 +79,5 @@ qui possède la donnée le fournit par un service. Règle vérifiée par `tests/
 ## Variables d'environnement
 
 Voir `.env.example`. Obligatoire hors tests : `DATABASE_URL`. Tests base : `TEST_DATABASE_URL`
-(base `mmorpg_test` exactement, toute autre valeur est refusée).
+(base `mmorpg_test` exactement, toute autre valeur est refusée). Premier administrateur : `ADMIN_EMAIL` et `ADMIN_PASSWORD`
+(facultatifs, ensemble ; lus par `npm run db:seed`, qui ne modifie jamais un compte existant).

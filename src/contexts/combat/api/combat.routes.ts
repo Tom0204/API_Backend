@@ -16,13 +16,13 @@ export interface CombatUseCases {
 }
 
 /** Routes protégées : lire, appeler, présenter. Aucune règle de combat ici. */
-export function createCombatRoutes(deps: CombatUseCases & { requireAuth: RequestHandler }): Router {
-    const { requireAuth, startCombat, playCombatAction, getMyCombat } = deps
+export function createCombatRoutes(deps: CombatUseCases & { requirePlayer: RequestHandler }): Router {
+    const { requirePlayer, startCombat, playCombatAction, getMyCombat } = deps
     const router = Router()
 
     router.post(
         '/api/v1/combats',
-        requireAuth,
+        requirePlayer,
         validate({ body: startCombatBody }),
         asyncHandler(async (req, res) => {
             const body = startCombatBody.parse(req.body)
@@ -33,7 +33,7 @@ export function createCombatRoutes(deps: CombatUseCases & { requireAuth: Request
 
     router.post(
         '/api/v1/combats/:combatId/actions',
-        requireAuth,
+        requirePlayer,
         validate({ params: combatParams, body: combatActionBody }),
         asyncHandler(async (req, res) => {
             const { combatId } = combatParams.parse(req.params)
@@ -45,7 +45,7 @@ export function createCombatRoutes(deps: CombatUseCases & { requireAuth: Request
 
     router.get(
         '/api/v1/combats/:combatId',
-        requireAuth,
+        requirePlayer,
         validate({ params: combatParams }),
         asyncHandler(async (req, res) => {
             const { combatId } = combatParams.parse(req.params)

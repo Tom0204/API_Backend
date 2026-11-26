@@ -9,6 +9,8 @@ collection Postman (`postman/`), mise à jour à chaque lot.
 - **Publiques :** `GET /health`, `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`,
   `GET /api/v1/classes`.
   **Toutes les autres** exigent `Authorization: Bearer <jeton d’accès>` ; sinon 401 avec `WWW-Authenticate: Bearer realm="api"`.
+- **Permissions** (ROLE-02, `docs/lots/L7.md` D1-D2), relues en base à chaque requête : `PLAY` pour les routes de jeu
+  (personnages, zones, combats, inventaire) ; `/api/v1/admin/*` exige la permission propre à chaque route ; sinon 403.
 - Le jeton de rafraîchissement ne sert qu’à `POST /api/v1/auth/refresh` (corps `{ "refreshToken" }`), jamais en `Bearer`.
   Jeton inconnu, expiré, révoqué ou déjà utilisé : même 401 `UNAUTHENTICATED`.
 
@@ -55,7 +57,8 @@ Le domaine lève une `DomainError` avec un `kind` ; un seul middleware la tradui
 | `kind` (domaine) | Statut | Usage |
 |---|---|---|
 | — (validation Zod) | 400 | Requête invalide **quel que soit l'état du serveur** |
-| `UNAUTHENTICATED` | 401 | Authentification absente, invalide ou expirée |
+| `UNAUTHENTICATED` | 401 | Authentification absente, invalide ou expirée, ou compte suspendu |
+| `FORBIDDEN` | 403 | Permission absente (`requirePermission`), ou compte visé plus privilégié que l'acteur |
 | `NOT_FOUND` | 404 | Ressource **de l'URL** inexistante **ou d'un autre joueur** |
 | `CONFLICT` | 409 | Unicité, limite atteinte, ressource déjà engagée |
 | `RULE_VIOLATION` | 422 | Condition de jeu non remplie, ou ressource **du corps** introuvable ou d'un autre joueur |
@@ -67,7 +70,7 @@ Le domaine lève une `DomainError` avec un `kind` ; un seul middleware la tradui
 ## 6. Codes d'erreur
 
 **Génériques :** `VALIDATION_ERROR`, `INVALID_JSON`, `UNAUTHENTICATED`, `ROUTE_NOT_FOUND`, `PAYLOAD_TOO_LARGE`,
-`UNSUPPORTED_MEDIA_TYPE`, `RATE_LIMITED`, `INTERNAL_ERROR`.
+`UNSUPPORTED_MEDIA_TYPE`, `RATE_LIMITED`, `INTERNAL_ERROR`, `FORBIDDEN` (403, permission insuffisante, ROLE-02).
 
 **Métier** (chaque lot complète ce tableau) :
 
@@ -84,6 +87,8 @@ Le domaine lève une `DomainError` avec un `kind` ; un seul middleware la tradui
 | `CHARACTER_ALREADY_IN_COMBAT` | 409 | Le personnage a déjà un combat `IN_PROGRESS` | COMBAT-02 |
 | `COMBAT_NOT_FOUND` | 404 | Combat inexistant ou d'un autre joueur | COMBAT-03 |
 | `COMBAT_FINISHED` | 422 | Action sur un combat terminé | COMBAT-03 |
+| `ACCOUNT_NOT_FOUND` | 404 | Compte visé par une route d'administration inexistant | ROLE-03 |
+| `SELF_ADMINISTRATION_REFUSED` | 422 | Suspension, réactivation ou changement de rôle de son propre compte | ROLE-03 |
 
 ## 7. Protections
 

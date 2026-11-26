@@ -17,6 +17,7 @@ import type { StatBlock } from '../../src/contexts/characters/domain/stats'
 import { Account } from '../../src/contexts/identity/domain/account'
 import type { AccountRepository } from '../../src/contexts/identity/app/interfaces/account-repository'
 import { Email } from '../../src/contexts/identity/domain/email'
+import { ALL_PERMISSIONS_MASK, Permissions } from '../../src/contexts/identity/domain/permissions'
 import { identityErrors } from '../../src/contexts/identity/domain/identity-errors'
 import { RefreshToken } from '../../src/contexts/identity/domain/refresh-token'
 import { Session } from '../../src/contexts/identity/domain/session'
@@ -40,6 +41,9 @@ interface AccountRecord {
     passwordHash: string
     failedLoginCount: number
     lockedUntil: Date | null
+    /** Masque de bits, comme la colonne `accounts.permissions`. */
+    permissions: number
+    suspendedAt: Date | null
     createdAt: Date
 }
 
@@ -369,6 +373,11 @@ function createAccountRepository(draft: InMemoryState): AccountRepository {
         // Les unités de travail sont déjà exécutées l'une après l'autre : équivalent du verrou sur le compte.
         findByIdForUpdate: async (id) => toAccount(draft.accounts.find((record) => record.id === id)),
         findByEmail: async (email) => toAccount(draft.accounts.find((record) => record.email === email.value)),
+        // Tri stable : à date égale, l'ordre d'insertion (équivalent des UUID v7 croissants).
+        list: async () =>
+            [...draft.accounts]
+                .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+                .flatMap((record) => toAccount(record) ?? []),
         insert: async (account) => {
             if (draft.accounts.some((record) => record.email === account.email.value)) {
                 throw identityErrors.emailAlreadyUsed() // équivalent de l'index unique
@@ -379,17 +388,19 @@ function createAccountRepository(draft: InMemoryState): AccountRepository {
                 passwordHash: account.passwordHash,
                 failedLoginCount: 0,
                 lockedUntil: null,
+                permissions: assertKnownBits(account.permissions.mask),
+                suspendedAt: null,
                 createdAt: new Date()
             }
             draft.accounts.push(record)
-            return Account.restore({ ...record, email: Email.create(record.email) })
+            return restoreAccount(record)
         },
         save: async (account) => {
-            const { id, failedLoginCount, lockedUntil } = account.snapshot
+            const { id, failedLoginCount, lockedUntil, permissions, suspendedAt } = account.snapshot
             const record = draft.accounts.find((candidate) => candidate.id === id)
             if (!record) throw new Error('Compte inexistant')
             if (failedLoginCount < 0) throw new Error('Contrainte CHECK violée : compteur négatif')
-            Object.assign(record, { failedLoginCount, lockedUntil })
+            Object.assign(record, { failedLoginCount, lockedUntil, permissions: assertKnownBits(permissions.mask), suspendedAt })
         }
     }
 }
@@ -519,7 +530,21 @@ function createCharacterRepository(draft: InMemoryState): CharacterRepository {
 }
 
 function toAccount(record: AccountRecord | undefined): Account | undefined {
-    return record ? Account.restore({ ...record, email: Email.create(record.email) }) : undefined
+    return record ? restoreAccount(record) : undefined
+}
+
+function restoreAccount(record: AccountRecord): Account {
+    return Account.restore({
+        ...record,
+        email: Email.create(record.email),
+        permissions: Permissions.fromMask(record.permissions)
+    })
+}
+
+/** Équivalent de la contrainte `accounts_permissions_known_bits`. */
+function assertKnownBits(mask: number): number {
+    if ((mask & ~ALL_PERMISSIONS_MASK) !== 0) throw new Error('Contrainte CHECK violée : accounts_permissions_known_bits')
+    return mask
 }
 
 function toCharacterClass(record: CharacterClassRecord | undefined): CharacterClass | undefined {

@@ -53,7 +53,7 @@ Un dossier n'existe que s'il contient quelque chose.
 
 ```ts
 // src/shared/domain/domain-error.ts
-export type DomainErrorKind = 'UNAUTHENTICATED' | 'NOT_FOUND' | 'CONFLICT' | 'RULE_VIOLATION'
+export type DomainErrorKind = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'RULE_VIOLATION'
 
 export class DomainError extends Error {
     constructor(readonly code: string, readonly kind: DomainErrorKind, message: string) {

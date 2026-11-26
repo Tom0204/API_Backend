@@ -22,8 +22,8 @@ Hors projet : voir `docs/rules.md` §1.
 | 3 | L3 Monde et combat | WORLD-01, COMBAT-01 à COMBAT-03 | Combat jouable jusqu'à la victoire ou la défaite | ✅ | 20db0d5 |
 | 4 | L4 Récompenses et livraison | REWARD-01, INV-01, DOC-01, QUAL-01 | Parcours complet, collection Postman, README | ✅ | 18f8130 |
 | 5 | L5 Événements de domaine | EVT-01 à EVT-03 | Événements de combats et journal en jeu | ✅ | 80861ea |
-| 6 | L6 Renforcement de l'authentification | AUTH-01 à AUTH-03 | Jetons d'accès et de rafraîchissement, déconnexion, verrouillage après échecs de connexion | ✅ | - |
-| 7 | L7 Rôles et administration | ROLE-01 à ROLE-03 | Permissions, contrôle centralisé et administration des comptes | ⏳ | - |
+| 6 | L6 Renforcement de l'authentification | AUTH-01 à AUTH-03 | Jetons d'accès et de rafraîchissement, déconnexion, verrouillage après échecs de connexion | ✅ | c6596d3 |
+| 7 | L7 Rôles et administration | ROLE-01 à ROLE-03 | Permissions, contrôle centralisé et administration des comptes | ✅ | - |
 | 8 | L8 Produit et documentation | PROD-01, PROD-02, DOC-02, QUAL-02 | Historique d'un combat, classement des personnages, documentation et revue | ⏳ | - |
 
 Chaque journée garde environ 1 h de marge. Décisions de chaque lot : `docs/lots/LN.md`.
@@ -278,37 +278,37 @@ Format : **Objectif**, **Critères** (3 à 5), **Tests**. Les exemples chiffrés
 ### Jour 7 — Rôles et administration
 
 #### ROLE-01 — Permissions en masque de bits
-**Statut :** ⏳ · **Dépend de :** ID-03
+**Statut :** ✅ · **Dépend de :** ID-03
 **Objectif :** objet-valeur `Permissions` : flags `1 << n` et rôles nommés comme combinaisons de flags.
 **Critères :**
-- [ ] Flags et rôles déclarés à un seul endroit ; `has` (`&`), `grant` (`|`), `revoke` (`& ~`) ; masque contenant un bit inconnu refusé à la construction.
-- [ ] Colonne de permissions sur le compte (migration, contrainte CHECK) ; tout nouveau compte reçoit le rôle joueur.
-- [ ] Premier administrateur créé par le seed à partir de variables d'environnement, jamais en dur.
+- [x] Flags et rôles déclarés à un seul endroit ; `has` (`&`), `grant` (`|`), `revoke` (`& ~`) ; masque contenant un bit inconnu refusé à la construction.
+- [x] Colonne de permissions sur le compte (migration, contrainte CHECK) ; tout nouveau compte reçoit le rôle joueur.
+- [x] Premier administrateur créé par le seed à partir de variables d'environnement, jamais en dur.
 **Tests :** opérations sur les bits, rôles, seed idempotent.
 
 #### ROLE-02 — Contrôle centralisé des permissions
-**Statut :** ⏳ · **Dépend de :** ROLE-01
+**Statut :** ✅ · **Dépend de :** ROLE-01
 **Objectif :** une seule fonction de contrôle, appelée par un middleware `requirePermission(...)`.
 **Critères :**
-- [ ] Permissions relues à chaque requête (pas dans le jeton) : un retrait de droit prend effet immédiatement.
-- [ ] Nouveau `kind` `FORBIDDEN` → 403, ajouté à `docs/conventions.md`.
-- [ ] Aucune vérification de rôle dispersée en `if` dans les cas d'usage ou les routes.
+- [x] Permissions relues à chaque requête (pas dans le jeton) : un retrait de droit prend effet immédiatement.
+- [x] Nouveau `kind` `FORBIDDEN` → 403, ajouté à `docs/conventions.md`.
+- [x] Aucune vérification de rôle dispersée en `if` dans les cas d'usage ou les routes.
 **Tests :** 403 sans la permission, accès avec, retrait immédiat.
 
 #### ROLE-03 — Administration des comptes
-**Statut :** ⏳ · **Dépend de :** ROLE-02, AUTH-02
+**Statut :** ✅ · **Dépend de :** ROLE-02, AUTH-02
 **Objectif :** routes `/api/v1/admin/accounts` : lister les comptes, suspendre ou réactiver, modifier le rôle.
 **Critères :**
-- [ ] Chaque route exige sa propre permission ; la liste n'expose aucune donnée sensible.
-- [ ] Suspendre un compte révoque toutes ses sessions ; un compte suspendu ne peut plus se connecter.
-- [ ] Un administrateur ne peut ni se suspendre ni retirer ses propres droits d'administration.
+- [x] Chaque route exige sa propre permission ; la liste n'expose aucune donnée sensible.
+- [x] Suspendre un compte révoque toutes ses sessions ; un compte suspendu ne peut plus se connecter.
+- [x] Un administrateur ne peut ni se suspendre ni retirer ses propres droits d'administration.
 **Tests :** chaque route avec et sans permission, suspension puis connexion refusée, garde-fous sur soi-même.
 
 ### Jour 8 — Produit et documentation
 
 #### PROD-01 — Historique d'un combat
 **Statut :** ⏳ · **Dépend de :** EVT-03 · **Règles :** §6
-**Objectif :** `GET /api/v1/combats/:combatId/history` : les tours dans l'ordre (attaquant, dégâts, PV restants). Reprend BONUS-02.
+**Objectif :** `GET /api/v1/combats/:combatId/history` : les tours dans l'ordre (attaquant, dégâts, PV restants).
 **Critères :**
 - [ ] Construit à partir du journal (EVT-03) ; combat en cours ou terminé.
 - [ ] Combat d'un autre joueur → même 404 `COMBAT_NOT_FOUND` qu'un inexistant.

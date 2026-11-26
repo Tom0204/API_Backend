@@ -4,6 +4,7 @@ import type { AppTransaction } from '../../src/platform/transaction'
 import type { UnitOfWork } from '../../src/shared/app/unit-of-work'
 import { Account, LOGIN_LOCK_DURATION_MS, MAX_FAILED_LOGIN_ATTEMPTS } from '../../src/contexts/identity/domain/account'
 import { Email } from '../../src/contexts/identity/domain/email'
+import { ROLES } from '../../src/contexts/identity/domain/permissions'
 import { Session } from '../../src/contexts/identity/domain/session'
 
 export interface ContractContext {
@@ -203,6 +204,61 @@ export function describeIdentityRepositoryContract(name: string, getContext: () 
                 lockedUntil: new Date(NOW.getTime() + LOGIN_LOCK_DURATION_MS)
             })
             expect(await unitOfWork.run(({ accounts }) => accounts.findByIdForUpdate(randomUUID()))).toBeUndefined()
+        })
+
+        it('insère les permissions du compte : joueur par défaut, administrateur si demandé (ROLE-01)', async () => {
+            const { unitOfWork, uniqueEmail } = getContext()
+
+            const [player, admin] = await unitOfWork.run(async ({ accounts }) => [
+                await accounts.insert(Account.create({ email: uniqueEmail(), passwordHash: 'hash' })),
+                await accounts.insert(Account.create({ email: uniqueEmail(), passwordHash: 'hash', role: 'ADMIN' }))
+            ])
+            const reread = await unitOfWork.run(({ accounts }) => accounts.findById(admin.id))
+
+            expect(player.permissions.mask).toBe(ROLES.PLAYER)
+            expect(player.snapshot.suspendedAt).toBeNull()
+            expect(reread?.permissions.mask).toBe(ROLES.ADMIN)
+        })
+
+        it('enregistre la suspension, la réactivation et le changement de rôle (ROLE-03)', async () => {
+            const { unitOfWork, uniqueEmail } = getContext()
+            const [admin, target] = await unitOfWork.run(async ({ accounts }) => [
+                await accounts.insert(Account.create({ email: uniqueEmail(), passwordHash: 'hash', role: 'ADMIN' })),
+                await accounts.insert(Account.create({ email: uniqueEmail(), passwordHash: 'hash' }))
+            ])
+            const update = (change: (account: Account) => void) =>
+                unitOfWork.run(async ({ accounts }) => {
+                    const account = await accounts.findByIdForUpdate(target.id)
+                    if (!account) throw new Error('compte introuvable')
+                    change(account)
+                    await accounts.save(account)
+                })
+            const reread = () => unitOfWork.run(({ accounts }) => accounts.findById(target.id))
+
+            await update((account) => {
+                account.suspend(admin, NOW)
+                account.changeRole(admin, 'MODERATOR')
+            })
+            expect((await reread())?.snapshot).toMatchObject({ suspendedAt: NOW })
+            expect((await reread())?.permissions.mask).toBe(ROLES.MODERATOR)
+
+            await update((account) => account.reactivate(admin))
+            expect((await reread())?.snapshot.suspendedAt).toBeNull()
+        })
+
+        it('liste les comptes du plus ancien au plus récent', async () => {
+            const { unitOfWork, uniqueEmail } = getContext()
+            const inserted: string[] = []
+            for (let i = 0; i < 3; i += 1) {
+                const account = await unitOfWork.run(({ accounts }) =>
+                    accounts.insert(Account.create({ email: uniqueEmail(), passwordHash: 'hash' }))
+                )
+                inserted.push(account.id)
+            }
+
+            const listed = (await unitOfWork.run(({ accounts }) => accounts.list())).map((account) => account.id)
+
+            expect(listed.filter((id) => inserted.includes(id))).toEqual(inserted)
         })
     })
 }

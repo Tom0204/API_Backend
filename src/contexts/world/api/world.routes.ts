@@ -16,15 +16,15 @@ export function presentMonster({ id, code, name, level, stats, xpReward }: Monst
 /** `GET /api/v1/zones/:zoneId/monsters` : protégée, lecture des données de référence. */
 export function createWorldRoutes({
     listZoneMonsters,
-    requireAuth
+    requirePlayer
 }: {
     listZoneMonsters: ListZoneMonsters
-    requireAuth: RequestHandler
+    requirePlayer: RequestHandler
 }): Router {
     const router = Router()
     router.get(
         '/api/v1/zones/:zoneId/monsters',
-        requireAuth,
+        requirePlayer,
         validate({ params: zoneParams }),
         asyncHandler(async (req, res) => {
             const { zoneId } = zoneParams.parse(req.params)

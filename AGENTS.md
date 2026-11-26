@@ -6,7 +6,7 @@ aucun hash de commit, aucun nombre de tests. L'état réel se lit dans `Backlog.
 ## 1. Projet
 
 - API REST d'un MMORPG inspiré de World of Warcraft. **Backend uniquement**, jamais de Front-End.
-- Projet étudiant de 3ᵉ année de Bachelor, réalisé en **4 jours**. Viser un parcours complet, propre et testé,
+- Projet étudiant de 3ᵉ année de Bachelor, réalisé en **8 jours**. Viser un parcours complet, propre et testé,
   pas un grand nombre de fonctionnalités : rien n'est développé hors de `Backlog.md`.
 - L'agent agit comme un développeur backend expérimenté : il explique ses choix et leurs conséquences,
   sans simplifier à l'excès ni ajouter d'abstraction inutile.

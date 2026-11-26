@@ -1,5 +1,5 @@
 // Schéma initial (ARCH-03), combats (L3), inventaire (L4), journal des événements (L5),
-// authentification renforcée (L6).
+// authentification renforcée (L6), rôles et administration (L7).
 // Identifiants UUID v7 générés par PostgreSQL 18. Contraintes CHECK : ajoutées en SQL dans la migration.
 
 generator client {
@@ -21,7 +21,11 @@ model Account {
   failedLoginCount Int         @default(0) @map("failed_login_count")
   /// Fin du verrouillage temporaire ; null si le compte n'est pas verrouillé.
   lockedUntil      DateTime?   @map("locked_until") @db.Timestamptz(3)
-  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// Masque de bits des permissions (ROLE-01) ; 1 = rôle joueur. Bits connus : contrainte CHECK.
+  permissions      Int         @default(1)
+  /// Date de suspension par un administrateur (ROLE-03) ; null si le compte est actif.
+  suspendedAt      DateTime?   @map("suspended_at") @db.Timestamptz(3)
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   sessions         Session[]
   characters       Character[]
 
