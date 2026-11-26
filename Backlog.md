@@ -24,7 +24,7 @@ Hors projet : voir `docs/rules.md` §1.
 | 5 | L5 Événements de domaine | EVT-01 à EVT-03 | Événements de combats et journal en jeu | ✅ | 80861ea |
 | 6 | L6 Renforcement de l'authentification | AUTH-01 à AUTH-03 | Jetons d'accès et de rafraîchissement, déconnexion, verrouillage après échecs de connexion | ✅ | c6596d3 |
 | 7 | L7 Rôles et administration | ROLE-01 à ROLE-03 | Permissions, contrôle centralisé et administration des comptes | ✅ | 9fe8db4 |
-| 8 | L8 Produit et documentation | PROD-01, PROD-02, DOC-02, QUAL-02 | Historique d'un combat, classement des personnages, documentation et revue | ✅ | - |
+| 8 | L8 Produit et documentation | PROD-01, PROD-02, DOC-02, QUAL-02 | Historique d'un combat, classement des personnages, documentation et revue | ✅ | 7604db5 |
 
 Chaque journée garde environ 1 h de marge. Décisions de chaque lot : `docs/lots/LN.md`.
 
