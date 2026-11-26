@@ -4,6 +4,9 @@ import { createCreateCharacter } from '../../src/contexts/characters/app/use-cas
 import type { PrismaClient } from '../../src/platform/prisma/client'
 import { findStartingZoneId } from '../../src/contexts/world/infra/find-starting-zone-id'
 import { createPrismaUnitOfWork } from '../../src/platform/prisma/prisma-unit-of-work'
+import { createEventHandlers } from '../../src/platform/events/event-handlers'
+import { createCryptoRandomSource } from '../../src/platform/system/crypto-random-source'
+import { createSystemClock } from '../../src/platform/system/system-clock'
 import { seedReferenceData } from '../../src/platform/prisma/seed-reference-data'
 import {
     type CharacterContractContext,
@@ -21,7 +24,7 @@ beforeAll(async () => {
     await seedReferenceData(prisma) // idempotent : indépendant de l'ordre des fichiers
     const warrior = await prisma.characterClass.findUniqueOrThrow({ where: { code: 'warrior' } })
     context = {
-        unitOfWork: createPrismaUnitOfWork(prisma),
+        unitOfWork: createPrismaUnitOfWork(prisma, createEventHandlers({ random: createCryptoRandomSource() })),
         createAccount: async () =>
             (await prisma.account.create({ data: { email: `${randomUUID()}${TEST_EMAIL_DOMAIN}`, passwordHash: 'h' } })).id,
         warriorClassId: warrior.id,
@@ -39,7 +42,7 @@ describeCharacterRepositoryContract('Prisma', () => context)
 describe('création de personnages sur PostgreSQL (concurrence)', () => {
     it('8 créations simultanées pour un même compte → exactement 5 (verrou sur le compte)', async () => {
         const accountId = await context.createAccount()
-        const createCharacter = createCreateCharacter({ unitOfWork: context.unitOfWork, startingZoneId: context.startingZoneId })
+        const createCharacter = createCreateCharacter({ unitOfWork: context.unitOfWork, startingZoneId: context.startingZoneId, clock: createSystemClock() })
 
         const results = await Promise.allSettled(
             Array.from({ length: 8 }, () =>
@@ -56,7 +59,7 @@ describe('création de personnages sur PostgreSQL (concurrence)', () => {
 
     it('même nom (casse différente) créé en même temps par deux comptes → 1 seul', async () => {
         const [alice, bob] = [await context.createAccount(), await context.createAccount()]
-        const createCharacter = createCreateCharacter({ unitOfWork: context.unitOfWork, startingZoneId: context.startingZoneId })
+        const createCharacter = createCreateCharacter({ unitOfWork: context.unitOfWork, startingZoneId: context.startingZoneId, clock: createSystemClock() })
         const name = uniqueCharacterName()
 
         const results = await Promise.allSettled([

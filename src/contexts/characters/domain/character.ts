@@ -1,3 +1,4 @@
+import type { CharacterLeveledUp } from './character-events'
 import type { CharacterName } from './character-name'
 import { Progression } from './progression'
 
@@ -15,6 +16,8 @@ export interface CharacterProps {
 export type NewCharacter = Omit<CharacterProps, 'id' | 'createdAt'>
 
 export class Character {
+    private events: CharacterLeveledUp[] = []
+
     private constructor(private props: CharacterProps) {}
 
     /** Création : niveau 1, XP 0, zone de départ (rules.md §4). */
@@ -40,11 +43,27 @@ export class Character {
         return this.props.accountId === accountId
     }
 
-    /** Seule façon de modifier l'XP : aucune route ne l'expose (rules.md §5). */
-    gainExperience(amount: number): number {
+    /** Seule façon de modifier l'XP : aucune route ne l'expose (rules.md §5). Enregistre `CharacterLeveledUp`. */
+    gainExperience(amount: number, now: Date): number {
         const { progression, levelsGained } = this.props.progression.gain(amount)
         this.props = { ...this.props, progression }
+        if (levelsGained > 0) {
+            this.events.push({
+                type: 'CharacterLeveledUp',
+                occurredAt: now,
+                characterId: this.props.id,
+                level: progression.level,
+                levelsGained
+            })
+        }
         return levelsGained
+    }
+
+    /** Événements enregistrés depuis la dernière lecture ; la liste est vidée. */
+    pullEvents(): CharacterLeveledUp[] {
+        const events = this.events
+        this.events = []
+        return events
     }
 
     get snapshot(): Readonly<CharacterProps> {

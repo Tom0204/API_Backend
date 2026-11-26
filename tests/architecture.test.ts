@@ -189,6 +189,21 @@ describe("règle de dépendance de l'architecture par contextes", () => {
         ])
     })
 
+    it("handlers d'événements (EVT-01) : jamais le contexte émetteur ; seulement leurs interfaces, leur domaine et shared", () => {
+        const handler = [
+            "import type { CombatWon } from '../../../combat/domain/combat-events'",
+            "import { createEventPublisher } from '../../../../platform/events/event-publisher'",
+            "import type { EventHandler } from '../../../../shared/app/event-publisher'",
+            "import { isCombatWon } from '../interfaces/combat-won'",
+            "import type { ExperienceGranted } from '../../domain/character-events'"
+        ].join('\n')
+
+        expect(findViolations('contexts/characters/app/handlers/faux.ts', handler)).toEqual([
+            'contexts/characters/app/handlers/faux.ts → ../../../combat/domain/combat-events',
+            'contexts/characters/app/handlers/faux.ts → ../../../../platform/events/event-publisher'
+        ])
+    })
+
     it("config : lit l'environnement, sans aucun import interne", () => {
         const source = ["import { z } from 'zod'", "import { MAX_LEVEL } from '../shared/domain/game-rules'"].join('\n')
 

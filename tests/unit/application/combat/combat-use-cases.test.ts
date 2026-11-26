@@ -8,15 +8,15 @@ import { createStartCombat } from '../../../../src/contexts/combat/app/use-cases
 import { createListZoneMonsters } from '../../../../src/contexts/world/app/use-cases/list-zone-monsters'
 import { Account } from '../../../../src/contexts/identity/domain/account'
 import { Email } from '../../../../src/contexts/identity/domain/email'
-import { FixedClock, FixedRandom } from '../../../fakes/fake-ports'
+import { FixedClock } from '../../../fakes/fake-ports'
 import { IN_MEMORY_STARTING_ZONE_ID, InMemoryDatabase } from '../../../fakes/in-memory-unit-of-work'
 
 function setup() {
     const database = new InMemoryDatabase()
     const clock = new FixedClock()
-    const random = new FixedRandom()
+    const random = database.random
     const deps = { unitOfWork: database, clock, random }
-    const createCharacter = createCreateCharacter({ unitOfWork: database, startingZoneId: IN_MEMORY_STARTING_ZONE_ID })
+    const createCharacter = createCreateCharacter({ unitOfWork: database, startingZoneId: IN_MEMORY_STARTING_ZONE_ID, clock: new FixedClock() })
     const newPlayer = async (classCode = 'warrior') => {
         const accountId = (
             await database.run(({ accounts }) =>

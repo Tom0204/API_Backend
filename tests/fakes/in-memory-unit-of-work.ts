@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { type AppRepositories, type AppTransaction, withContextServices } from '../../src/platform/transaction'
+import { createEventHandlers } from '../../src/platform/events/event-handlers'
+import type { EventHandler } from '../../src/shared/app/event-publisher'
+import type { JournalRepository } from '../../src/contexts/journal/app/interfaces/journal-repository'
+import type { GameEventEntry } from '../../src/contexts/journal/domain/game-event-entry'
+import { FixedRandom } from './fake-ports'
 import type { UnitOfWork } from '../../src/shared/app/unit-of-work'
 import { Character } from '../../src/contexts/characters/domain/character'
 import { CharacterClass } from '../../src/contexts/characters/domain/character-class'
@@ -96,6 +101,7 @@ export interface InMemoryState {
     monsters: MonsterRecord[]
     combats: CombatRecord[]
     inventoryItems: InventoryItemRecord[]
+    gameEvents: (GameEventEntry & { seq: number })[]
 }
 
 /** Zone de départ des tests sans base (équivalent de la Clairière du seed). */
@@ -139,14 +145,15 @@ export class InMemoryDatabase implements UnitOfWork<AppTransaction> {
         items: ITEMS.map((item) => ({ id: randomUUID(), code: item.code, name: item.name })),
         monsters: [],
         combats: [],
-        inventoryItems: []
+        inventoryItems: [],
+        gameEvents: []
     }
     private queue: Promise<unknown> = Promise.resolve()
 
     run<T>(work: (transaction: AppTransaction) => Promise<T>): Promise<T> {
         const next = this.queue.then(async () => {
             const draft = structuredClone(this.state)
-            const result = await work(withContextServices(createRepositories(draft)))
+            const result = await work(withContextServices(createRepositories(draft), this.handlers))
             this.state = draft
             return result
         })
@@ -154,7 +161,16 @@ export class InMemoryDatabase implements UnitOfWork<AppTransaction> {
         return next
     }
 
-    constructor() {
+    /** Source aléatoire du handler de butin : fixée par les tests (0,9 par défaut : aucun butin). */
+    readonly random: FixedRandom
+    readonly handlers: readonly EventHandler<AppTransaction>[]
+
+    constructor({
+        random = new FixedRandom(),
+        handlers
+    }: { random?: FixedRandom; handlers?: readonly EventHandler<AppTransaction>[] } = {}) {
+        this.random = random
+        this.handlers = handlers ?? createEventHandlers({ random })
         this.state.zones = seedZones()
         this.state.monsters = seedMonsters(this.state.zones, this.state.items)
     }
@@ -189,7 +205,8 @@ function createRepositories(draft: InMemoryState): AppRepositories {
         classes: createCharacterClassRepository(draft),
         world: createWorldRepository(draft),
         combats: createCombatRepository(draft),
-        inventories: createInventoryRepository(draft)
+        inventories: createInventoryRepository(draft),
+        journal: createJournalRepository(draft)
     }
 }
 
@@ -275,6 +292,28 @@ function createCombatRepository(draft: InMemoryState): CombatRepository {
                 monster: { ...record.monster, hp: monster.hp }
             })
         }
+    }
+}
+
+function createJournalRepository(draft: InMemoryState): JournalRepository {
+    const read = (keep: (entry: GameEventEntry) => boolean) =>
+        draft.gameEvents
+            .filter(keep)
+            .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime() || a.seq - b.seq)
+            .map(({ seq: _seq, ...entry }) => structuredClone(entry))
+    return {
+        append: async (entry) => {
+            if (!draft.characters.some((record) => record.id === entry.characterId)) {
+                throw new Error('Clé étrangère violée : personnage inexistant')
+            }
+            if (entry.combatId !== null && !draft.combats.some((record) => record.id === entry.combatId)) {
+                throw new Error('Clé étrangère violée : combat inexistant')
+            }
+            if (entry.type.trim() === '') throw new Error('Contrainte CHECK violée : type vide') // game_events_type_not_blank
+            draft.gameEvents.push({ ...structuredClone(entry), seq: draft.gameEvents.length })
+        },
+        findByCharacter: async (characterId) => read((entry) => entry.characterId === characterId),
+        findByCombat: async (combatId) => read((entry) => entry.combatId === combatId)
     }
 }
 

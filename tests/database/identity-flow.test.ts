@@ -3,6 +3,8 @@ import { createLogin } from '../../src/contexts/identity/app/use-cases/login'
 import { createRegisterAccount } from '../../src/contexts/identity/app/use-cases/register-account'
 import type { PrismaClient } from '../../src/platform/prisma/client'
 import { createPrismaUnitOfWork } from '../../src/platform/prisma/prisma-unit-of-work'
+import { createEventHandlers } from '../../src/platform/events/event-handlers'
+import { createCryptoRandomSource } from '../../src/platform/system/crypto-random-source'
 import { createArgon2PasswordHasher } from '../../src/contexts/identity/infra/argon2-password-hasher'
 import { createCryptoTokenGenerator } from '../../src/contexts/identity/infra/crypto-token-generator'
 import { createSystemClock } from '../../src/platform/system/system-clock'
@@ -19,7 +21,7 @@ describe('identité sur PostgreSQL (implémentations réelles)', () => {
         prisma = await connectTestDatabase()
         await deleteTestAccounts(prisma)
         const deps = {
-            unitOfWork: createPrismaUnitOfWork(prisma),
+            unitOfWork: createPrismaUnitOfWork(prisma, createEventHandlers({ random: createCryptoRandomSource() })),
             passwordHasher: createArgon2PasswordHasher(),
             tokenGenerator: createCryptoTokenGenerator(),
             clock: createSystemClock()

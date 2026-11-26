@@ -27,7 +27,7 @@ describe('Character', () => {
             createdAt: new Date()
         })
 
-        expect(character.gainExperience(300)).toBe(2)
+        expect(character.gainExperience(300, new Date())).toBe(2)
         expect(character.snapshot.progression).toMatchObject({ level: 3, experience: 7 })
         expect(character.isOwnedBy('account-1')).toBe(true)
         expect(character.isOwnedBy('account-2')).toBe(false)

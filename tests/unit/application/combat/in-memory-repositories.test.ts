@@ -6,12 +6,13 @@ import { Email } from '../../../../src/contexts/identity/domain/email'
 import { uniqueCharacterName } from '../../../contracts/character-repositories.contract'
 import { type CombatContractContext, describeCombatRepositoryContract } from '../../../contracts/combat-repositories.contract'
 import { IN_MEMORY_STARTING_ZONE_ID, InMemoryDatabase } from '../../../fakes/in-memory-unit-of-work'
+import { FixedClock } from '../../../fakes/fake-ports'
 
 let context: CombatContractContext
 
 beforeEach(() => {
     const database = new InMemoryDatabase()
-    const createCharacter = createCreateCharacter({ unitOfWork: database, startingZoneId: IN_MEMORY_STARTING_ZONE_ID })
+    const createCharacter = createCreateCharacter({ unitOfWork: database, startingZoneId: IN_MEMORY_STARTING_ZONE_ID, clock: new FixedClock() })
     context = {
         unitOfWork: database,
         createCharacter: async () => {

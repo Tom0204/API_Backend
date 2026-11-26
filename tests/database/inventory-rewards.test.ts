@@ -8,6 +8,7 @@ import type { UnitOfWork } from '../../src/shared/app/unit-of-work'
 import type { PrismaClient } from '../../src/platform/prisma/client'
 import { findStartingZoneId } from '../../src/contexts/world/infra/find-starting-zone-id'
 import { createPrismaUnitOfWork } from '../../src/platform/prisma/prisma-unit-of-work'
+import { createEventHandlers } from '../../src/platform/events/event-handlers'
 import { seedReferenceData } from '../../src/platform/prisma/seed-reference-data'
 import { createSystemClock } from '../../src/platform/system/system-clock'
 import { uniqueCharacterName } from '../contracts/character-repositories.contract'
@@ -26,9 +27,9 @@ beforeAll(async () => {
     prisma = await connectTestDatabase()
     await deleteTestAccounts(prisma) // supprime aussi personnages, combats et inventaires (cascade)
     await seedReferenceData(prisma)
-    unitOfWork = createPrismaUnitOfWork(prisma)
+    unitOfWork = createPrismaUnitOfWork(prisma, createEventHandlers({ random: new FixedRandom() }))
     const warrior = await prisma.characterClass.findUniqueOrThrow({ where: { code: 'warrior' } })
-    const createCharacter = createCreateCharacter({ unitOfWork, startingZoneId: await findStartingZoneId(prisma) })
+    const createCharacter = createCreateCharacter({ unitOfWork, startingZoneId: await findStartingZoneId(prisma), clock: createSystemClock() })
     wolfId = (await prisma.monsterTemplate.findUniqueOrThrow({ where: { code: 'wolf' } })).id
     createPlayer = async () => {
         const account = await prisma.account.create({ data: { email: `${randomUUID()}${TEST_EMAIL_DOMAIN}`, passwordHash: 'h' } })
@@ -53,11 +54,18 @@ describeInventoryRepositoryContract('Prisma', () => context)
 describe('récompenses de victoire sur PostgreSQL', () => {
     const clock = createSystemClock()
 
+    /** Unité de travail dont le handler de butin tire la valeur `random` (rules.md §7). */
+    const withRandom = (random: FixedRandom) => {
+        const handlers = createEventHandlers({ random })
+        return { handlers, unitOfWork: createPrismaUnitOfWork(prisma, handlers) }
+    }
+
     /** Combat contre le loup joué jusqu'à la veille du dernier coup (exemple §8 : 3 actions sur 4). */
     async function combatBeforeFinalBlow(random: FixedRandom) {
+        const { unitOfWork } = withRandom(random)
         const player = await createPlayer()
         const { combat } = await createStartCombat({ unitOfWork, clock }).execute({ ...player, monsterId: wolfId })
-        const play = createPlayCombatAction({ unitOfWork, clock, random })
+        const play = createPlayCombatAction({ unitOfWork, clock })
         for (let i = 0; i < 3; i += 1) await play.execute({ accountId: player.accountId, combatId: combat.id, type: 'ATTACK' })
         return { player, combatId: combat.id }
     }
@@ -71,7 +79,7 @@ describe('récompenses de victoire sur PostgreSQL', () => {
         const random = new FixedRandom(0.31)
         const { player, combatId } = await combatBeforeFinalBlow(random)
 
-        const final = await createPlayCombatAction({ unitOfWork, clock, random }).execute({ accountId: player.accountId, combatId, type: 'ATTACK' })
+        const final = await createPlayCombatAction({ unitOfWork: withRandom(random).unitOfWork, clock }).execute({ accountId: player.accountId, combatId, type: 'ATTACK' })
 
         expect(final.rewards).toMatchObject({ experienceGained: 25, levelsGained: 0 })
         expect(await stateOf(player.characterId, combatId)).toEqual({
@@ -87,7 +95,7 @@ describe('récompenses de victoire sur PostgreSQL', () => {
         const before = await stateOf(player.characterId, combatId)
 
         await expect(
-            createPlayCombatAction({ unitOfWork: withFailingInventorySave(unitOfWork), clock, random }).execute({
+            createPlayCombatAction({ unitOfWork: withFailingInventorySave(withRandom(random).unitOfWork, withRandom(random).handlers), clock }).execute({
                 accountId: player.accountId,
                 combatId,
                 type: 'ATTACK'
@@ -101,7 +109,7 @@ describe('récompenses de victoire sur PostgreSQL', () => {
     it('deux actions finales simultanées → une seule attribution (verrou sur le combat)', async () => {
         const random = new FixedRandom(0.31)
         const { player, combatId } = await combatBeforeFinalBlow(random)
-        const play = createPlayCombatAction({ unitOfWork, clock, random })
+        const play = createPlayCombatAction({ unitOfWork: withRandom(random).unitOfWork, clock })
 
         const results = await Promise.allSettled([
             play.execute({ accountId: player.accountId, combatId, type: 'ATTACK' }),

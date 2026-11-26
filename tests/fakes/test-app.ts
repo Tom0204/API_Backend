@@ -16,7 +16,7 @@ import { createLogin } from '../../src/contexts/identity/app/use-cases/login'
 import { createRegisterAccount } from '../../src/contexts/identity/app/use-cases/register-account'
 import { createGetMyInventory } from '../../src/contexts/inventory/app/use-cases/get-my-inventory'
 import { type AppOptions, createApp } from '../../src/platform/http/app'
-import { FakePasswordHasher, FakeTokenGenerator, FixedClock, FixedRandom } from './fake-ports'
+import { FakePasswordHasher, FakeTokenGenerator, FixedClock } from './fake-ports'
 import { IN_MEMORY_STARTING_ZONE_ID, InMemoryDatabase } from './in-memory-unit-of-work'
 
 /** Application HTTP complète sur les faux : jamais `main.ts`, jamais de base. */
@@ -25,7 +25,7 @@ export function buildTestApp(overrides: Partial<Omit<AppOptions, 'logger'>> = {}
     const passwordHasher = new FakePasswordHasher()
     const tokenGenerator = new FakeTokenGenerator()
     const clock = new FixedClock()
-    const random = new FixedRandom() // 0,9 par défaut : aucun butin ; modifiable par les tests
+    const random = database.random // handler de butin : 0,9 par défaut (aucun butin), modifiable par les tests
 
     const logLines: string[] = []
     const logger = pino(

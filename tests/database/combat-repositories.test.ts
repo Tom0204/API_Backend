@@ -6,6 +6,7 @@ import { createStartCombat } from '../../src/contexts/combat/app/use-cases/start
 import type { PrismaClient } from '../../src/platform/prisma/client'
 import { findStartingZoneId } from '../../src/contexts/world/infra/find-starting-zone-id'
 import { createPrismaUnitOfWork } from '../../src/platform/prisma/prisma-unit-of-work'
+import { createEventHandlers } from '../../src/platform/events/event-handlers'
 import { seedReferenceData } from '../../src/platform/prisma/seed-reference-data'
 import { createCryptoRandomSource } from '../../src/platform/system/crypto-random-source'
 import { createSystemClock } from '../../src/platform/system/system-clock'
@@ -22,10 +23,10 @@ beforeAll(async () => {
     prisma = await connectTestDatabase()
     await deleteTestAccounts(prisma) // supprime aussi personnages et combats (cascade)
     await seedReferenceData(prisma)
-    const unitOfWork = createPrismaUnitOfWork(prisma)
+    const unitOfWork = createPrismaUnitOfWork(prisma, createEventHandlers({ random: createCryptoRandomSource() }))
     const startingZoneId = await findStartingZoneId(prisma)
     const warrior = await prisma.characterClass.findUniqueOrThrow({ where: { code: 'warrior' } })
-    const createCharacter = createCreateCharacter({ unitOfWork, startingZoneId })
+    const createCharacter = createCreateCharacter({ unitOfWork, startingZoneId, clock: createSystemClock() })
     monsterIds = {
         wolf: (await prisma.monsterTemplate.findUniqueOrThrow({ where: { code: 'wolf' } })).id,
         boar: (await prisma.monsterTemplate.findUniqueOrThrow({ where: { code: 'boar' } })).id
@@ -51,7 +52,7 @@ afterAll(async () => {
 describeCombatRepositoryContract('Prisma', () => context)
 
 describe('combat sur PostgreSQL (concurrence)', () => {
-    const deps = () => ({ unitOfWork: context.unitOfWork, clock: createSystemClock(), random: createCryptoRandomSource() })
+    const deps = () => ({ unitOfWork: context.unitOfWork, clock: createSystemClock() })
 
     it('2 démarrages simultanés pour le même personnage → 1 seul combat', async () => {
         const player = await createPlayer()

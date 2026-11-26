@@ -17,6 +17,7 @@ import { loadEnvironment } from './config/environment'
 import { createLogger } from './platform/logging/logger'
 import { createPrismaClient } from './platform/prisma/client'
 import { findStartingZoneId } from './contexts/world/infra/find-starting-zone-id'
+import { createEventHandlers } from './platform/events/event-handlers'
 import { createPrismaUnitOfWork } from './platform/prisma/prisma-unit-of-work'
 import { createArgon2PasswordHasher } from './contexts/identity/infra/argon2-password-hasher'
 import { createCryptoTokenGenerator } from './contexts/identity/infra/crypto-token-generator'
@@ -30,11 +31,11 @@ async function main(): Promise<void> {
     const logger = createLogger(env.LOG_LEVEL)
 
     const prisma = createPrismaClient(env.DATABASE_URL)
-    const unitOfWork = createPrismaUnitOfWork(prisma)
     const passwordHasher = createArgon2PasswordHasher()
     const tokenGenerator = createCryptoTokenGenerator()
     const clock = createSystemClock()
     const random = createCryptoRandomSource()
+    const unitOfWork = createPrismaUnitOfWork(prisma, createEventHandlers({ random }))
 
     let startingZoneId: string
     try {
@@ -53,13 +54,13 @@ async function main(): Promise<void> {
             authenticate: createAuthenticate({ unitOfWork, tokenGenerator, clock }),
             getCurrentAccount: createGetCurrentAccount({ unitOfWork }),
             listClasses: createListClasses({ unitOfWork }),
-            createCharacter: createCreateCharacter({ unitOfWork, startingZoneId }),
+            createCharacter: createCreateCharacter({ unitOfWork, startingZoneId, clock }),
             listMyCharacters: createListMyCharacters({ unitOfWork }),
             getMyCharacter: createGetMyCharacter({ unitOfWork }),
             getCharacterStats: createGetCharacterStats({ unitOfWork }),
             listZoneMonsters: createListZoneMonsters({ unitOfWork }),
             startCombat: createStartCombat({ unitOfWork, clock }),
-            playCombatAction: createPlayCombatAction({ unitOfWork, clock, random }),
+            playCombatAction: createPlayCombatAction({ unitOfWork, clock }),
             getMyCombat: createGetMyCombat({ unitOfWork }),
             getMyInventory: createGetMyInventory({ unitOfWork })
         },

@@ -8,10 +8,11 @@ import { createListMyCharacters } from '../../../../src/contexts/characters/app/
 import { Account } from '../../../../src/contexts/identity/domain/account'
 import { Email } from '../../../../src/contexts/identity/domain/email'
 import { IN_MEMORY_STARTING_ZONE_ID, InMemoryDatabase } from '../../../fakes/in-memory-unit-of-work'
+import { FixedClock } from '../../../fakes/fake-ports'
 
 function setup() {
     const database = new InMemoryDatabase()
-    const deps = { unitOfWork: database }
+    const deps = { unitOfWork: database, clock: new FixedClock() }
     const createAccount = async (email = `${randomUUID()}@example.com`) =>
         (await database.run(({ accounts }) => accounts.insert(Account.create({ email: Email.create(email), passwordHash: 'h' })))).id
     return {

@@ -214,32 +214,32 @@ Format : **Objectif**, **Critères** (3 à 5), **Tests**. Les exemples chiffrés
 ### Jour 5 — Événements de domaine
 
 #### EVT-01 — Événements de domaine et publication
-**Statut :** ⏳ · **Dépend de :** QUAL-01
+**Statut :** ✅ · **Dépend de :** QUAL-01
 **Objectif :** les agrégats enregistrent des événements ; le cas d'usage les publie dans sa transaction.
 **Critères :**
-- [ ] Événements immuables nommés au passé (`CombatWon`…), déclarés dans le domaine du contexte émetteur ; un handler déclare dans ses `app/interfaces` la forme qu'il attend (aucun import entre contextes).
-- [ ] Port de publication dans `shared/app` ; handlers enregistrés uniquement dans `platform/` ; exécution synchrone dans le `UnitOfWork` : un handler en échec annule toute la transaction.
-- [ ] Ordre des handlers déterministe ; un événement n'est publié qu'une fois.
-- [ ] `tests/architecture.test.ts` couvre les handlers.
+- [x] Événements immuables nommés au passé (`CombatWon`…), déclarés dans le domaine du contexte émetteur ; un handler déclare dans ses `app/interfaces` la forme qu'il attend (aucun import entre contextes).
+- [x] Port de publication dans `shared/app` ; handlers enregistrés uniquement dans `platform/` ; exécution synchrone dans le `UnitOfWork` : un handler en échec annule toute la transaction.
+- [x] Ordre des handlers déterministe ; un événement n'est publié qu'une fois.
+- [x] `tests/architecture.test.ts` couvre les handlers.
 **Tests :** publication et ordre ; annulation si un handler échoue (mémoire et PostgreSQL).
 
 #### EVT-02 — Victoire par l'événement `CombatWon`
-**Statut :** ⏳ · **Dépend de :** EVT-01 · **Règles :** §5, §7
+**Statut :** ✅ · **Dépend de :** EVT-01 · **Règles :** §5, §7
 **Objectif :** remplacer l'appel direct des récompenses par `CombatWon` et deux handlers (characters : XP ; inventory : butin). Reprend BONUS-03.
 **Critères :**
-- [ ] `Combat` émet `CombatWon` à la transition `VICTORY` ; une défaite n'émet aucun événement de récompense.
-- [ ] Handler characters : XP, avec l'ordre des verrous combat → personnage conservé ; handler inventory : tirage par `RandomSource` et ajout du butin.
-- [ ] Contrats `CombatFighters.grantExperience` et `CombatLoot` supprimés ; réponse finale inchangée (`rewards`, L4 D2).
-- [ ] Les tests de REWARD-01 passent sans changer leurs valeurs (une seule attribution, panne injectée, concurrence).
+- [x] `Combat` émet `CombatWon` à la transition `VICTORY` ; une défaite n'émet aucun événement de récompense.
+- [x] Handler characters : XP, avec l'ordre des verrous combat → personnage conservé ; handler inventory : tirage par `RandomSource` et ajout du butin.
+- [x] Contrats `CombatFighters.grantExperience` et `CombatLoot` supprimés ; réponse finale inchangée (`rewards`, L4 D2).
+- [x] Les tests de REWARD-01 passent sans changer leurs valeurs (une seule attribution, panne injectée, concurrence).
 **Tests :** suite REWARD-01 ; chaque handler isolément.
 
 #### EVT-03 — Journal des événements de jeu
-**Statut :** ⏳ · **Dépend de :** EVT-02
+**Statut :** ✅ · **Dépend de :** EVT-02
 **Objectif :** un handler enregistre les événements de jeu dans un journal, base de l'historique de combat (PROD-01).
 **Critères :**
-- [ ] Au moins : création de personnage, passage de niveau, début, tours et fin de combat.
-- [ ] Table de journal (migration) écrite dans la même transaction ; date fournie par `Clock`.
-- [ ] Aucune donnée sensible dans le journal.
+- [x] Au moins : création de personnage, passage de niveau, début, tours et fin de combat.
+- [x] Table de journal (migration) écrite dans la même transaction ; date fournie par `Clock`.
+- [x] Aucune donnée sensible dans le journal.
 **Tests :** journal d'un parcours complet ; annulation avec la transaction.
 
 ### Jour 6 — Authentification renforcée

@@ -10,15 +10,15 @@ import type { UnitOfWork } from '../../../../src/shared/app/unit-of-work'
 import { Account } from '../../../../src/contexts/identity/domain/account'
 import { Email } from '../../../../src/contexts/identity/domain/email'
 import { withFailingInventorySave } from '../../../fakes/failing-unit-of-work'
-import { FixedClock, FixedRandom } from '../../../fakes/fake-ports'
+import { FixedClock } from '../../../fakes/fake-ports'
 import { IN_MEMORY_STARTING_ZONE_ID, InMemoryDatabase } from '../../../fakes/in-memory-unit-of-work'
 
 function setup() {
     const database = new InMemoryDatabase()
     const clock = new FixedClock()
-    const random = new FixedRandom()
+    const random = database.random
     const deps = { unitOfWork: database, clock, random }
-    const createCharacter = createCreateCharacter({ unitOfWork: database, startingZoneId: IN_MEMORY_STARTING_ZONE_ID })
+    const createCharacter = createCreateCharacter({ unitOfWork: database, startingZoneId: IN_MEMORY_STARTING_ZONE_ID, clock: new FixedClock() })
     const startCombat = createStartCombat(deps)
     const playCombatAction = createPlayCombatAction(deps)
 
@@ -52,7 +52,7 @@ function setup() {
     }
     const inventoryOf = (characterId: string) =>
         database.state.inventoryItems.filter((item) => item.characterId === characterId).map(({ itemId, quantity }) => ({ itemId, quantity }))
-    const playWith = (unitOfWork: UnitOfWork<AppTransaction>) => createPlayCombatAction({ unitOfWork, clock, random })
+    const playWith = (unitOfWork: UnitOfWork<AppTransaction>) => createPlayCombatAction({ unitOfWork, clock })
 
     return {
         database,
@@ -162,7 +162,7 @@ describe('REWARD-01 — récompenses de victoire', () => {
         const before = structuredClone(ctx.database.state.combats.find((c) => c.id === combatId))
 
         await expect(
-            ctx.playWith(withFailingInventorySave(ctx.database)).execute({ accountId: player.accountId, combatId, type: 'ATTACK' })
+            ctx.playWith(withFailingInventorySave(ctx.database, ctx.database.handlers)).execute({ accountId: player.accountId, combatId, type: 'ATTACK' })
         ).rejects.toThrow('Panne injectée')
 
         expect(ctx.database.state.combats.find((c) => c.id === combatId)).toEqual(before) // toujours IN_PROGRESS, mêmes PV

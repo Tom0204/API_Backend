@@ -61,17 +61,18 @@ Aucune autre dépendance sans décision D validée.
 
 Détail et exemple complet : `docs/architecture.md`. Les règles ci-dessous sont **non négociables**.
 
-**Organisation par contexte** (`identity`, `characters`, `world`, `combat`, `inventory`) : `src/contexts/<contexte>/<couche>/`.
+**Organisation par contexte** (`identity`, `characters`, `world`, `combat`, `inventory`, `journal`) : `src/contexts/<contexte>/<couche>/`.
 Un dossier n'existe que s'il contient quelque chose.
 
 | Dossier | Contient | Peut importer |
 |---|---|---|
 | `src/shared/domain/` | `DomainError`, `game-rules.ts` (paramètres de `rules.md`) | `shared/domain/` |
-| `src/shared/app/` | Ports communs : `UnitOfWork<R>`, `Clock`, `RandomSource`, `AuthContext` | `shared/` |
+| `src/shared/app/` | Ports communs : `UnitOfWork<R>`, `Clock`, `RandomSource`, `AuthContext`, `EventPublisher`, `EventHandler` | `shared/` |
 | `contexts/X/domain/` | Agrégats, entités, objets-valeurs, règles de jeu, erreurs métier | `X/domain`, `shared/domain` |
 | `contexts/X/app/use-cases/` | Un cas d'usage par fichier : type d'entrée, type de sortie, `execute` | `X/domain`, `X/app`, `shared` |
 | `contexts/X/app/interfaces/` | Ce dont les cas d'usage ont besoin : repositories, outils techniques, **données d'un autre contexte** | idem |
 | `contexts/X/app/services/` | Ce que X offre aux autres contextes, dans la forme de **leur** interface (typage structurel) | idem |
+| `contexts/X/app/handlers/` | Réactions de X aux événements (un handler par fichier) ; renvoient les événements qu'elles produisent | idem |
 | `contexts/X/app/utils/` | Fonctions partagées par plusieurs cas d'usage (conversion en sortie, contrôle de propriété) | idem |
 | `contexts/X/api/` | Routes, contrôleurs, schémas Zod, présentateurs | `X/app`, `shared`, `platform/http` ; de `X/domain`, seulement les erreurs et, dans les `*.schemas.ts`, les constantes de validation |
 | `contexts/X/infra/` | Implémentations Prisma, adaptateurs (Argon2, jetons) | `X/domain`, `X/app`, `shared`, `platform/prisma`, client généré |
@@ -83,12 +84,18 @@ Un dossier n'existe que s'il contient quelque chose.
 - **Entre contextes :** le contexte consommateur déclare un contrat dans ses `app/interfaces` (ex. `CombatFighters`),
   dans ses propres termes ; le contexte propriétaire le satisfait par un service qui applique ses propres règles.
   Seul `platform/transaction.ts` relie services et contrats, et TypeScript y vérifie leur compatibilité.
+- **Événements de domaine :** faits passés et immuables (`CombatWon`), déclarés dans le domaine du contexte émetteur ;
+  l'agrégat les enregistre (`pullEvents()`), le cas d'usage les publie par le port `EventPublisher` de sa transaction.
+  Un événement de création, dont l'identifiant vient de la base, est construit par le cas d'usage après l'insertion.
+  Chaque contexte récepteur déclare dans ses `app/interfaces` la forme qu'il attend (garde de type sur le `type`).
+  Handlers enregistrés dans `platform/events/event-handlers.ts` seulement, dans un ordre fixe ; exécution synchrone
+  dans le `UnitOfWork` (file FIFO) : un handler en échec annule toute la transaction. Pas de bus asynchrone.
 - **Cas d'usage :** `createXxx(deps)` renvoie `execute(input)`. Il déclare un type `Transaction` avec **uniquement** ce
   qu'il utilise (`UnitOfWork<Transaction>`) et renvoie une **sortie simple** : jamais une entité du domaine.
   Les présentateurs ne connaissent que ces sorties.
 - **Agrégats :** modifiés uniquement par leur racine ; référencés entre eux **par identifiant**.
   Une transaction ne modifie qu'un agrégat, sauf la fin de combat (combat + personnage + inventaire), coordonnée par
-  un seul cas d'usage dans un `UnitOfWork`, à travers les contrats de combat.
+  un seul cas d'usage dans un `UnitOfWork`, par l'événement `CombatWon` et ses handlers (characters, inventory).
 - **Objets-valeurs** immuables, validés à la construction (`CharacterName.create(...)`).
 - **Règles de jeu** en méthodes du domaine ou fonctions pures ; paramètres de `rules.md` dans
   `src/shared/domain/game-rules.ts`, jamais de valeur magique ailleurs.

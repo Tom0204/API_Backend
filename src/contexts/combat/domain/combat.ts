@@ -1,4 +1,5 @@
 import { combatErrors } from './combat-errors'
+import type { CombatEvent } from './combat-events'
 import { Combatant, type CombatantStats } from './combatant'
 import { computeDamage } from './damage'
 
@@ -33,6 +34,8 @@ export type NewCombat = CombatState
  * Le joueur ne fait que `ATTACK` ; le monstre riposte dans la même requête. `VICTORY` et `DEFEAT` sont terminaux.
  */
 export class Combat {
+    private events: CombatEvent[] = []
+
     private constructor(private props: CombatProps) {}
 
     /**
@@ -75,20 +78,44 @@ export class Combat {
         return this.props.status !== 'IN_PROGRESS'
     }
 
-    /** Action `ATTACK` du joueur, puis riposte du monstre s'il est encore debout. */
+    /**
+     * Action `ATTACK` du joueur, puis riposte du monstre s'il est encore debout.
+     * Enregistre un `CombatTurnPlayed` par attaque (L5 D4), puis `CombatWon` ou `CombatLost` à la fin.
+     */
     attack(now: Date): TurnResult {
         if (this.isFinished) throw combatErrors.finished()
 
         const characterDamage = computeDamage(this.props.character.stats.attack, this.props.monster.stats.defense)
         const monster = this.props.monster.takeDamage(characterDamage)
+        this.recordTurn('CHARACTER', characterDamage, this.props.character.hp, monster.hp, now)
         if (monster.isDefeated) {
             this.props = { ...this.props, monster, status: 'VICTORY', finishedAt: now }
+            this.recordEnd('CombatWon', now)
             return { characterDamage, monsterDamage: null }
         }
 
         const { state, damage } = monsterAttacks({ ...this.props, monster }, now)
         this.props = { ...this.props, ...state }
+        this.recordTurn('MONSTER', damage, state.character.hp, monster.hp, now)
+        if (state.status === 'DEFEAT') this.recordEnd('CombatLost', now)
         return { characterDamage, monsterDamage: damage }
+    }
+
+    /** Événements enregistrés depuis la dernière lecture ; la liste est vidée (publication unique). */
+    pullEvents(): CombatEvent[] {
+        const events = this.events
+        this.events = []
+        return events
+    }
+
+    private recordTurn(attacker: 'CHARACTER' | 'MONSTER', damage: number, characterHp: number, monsterHp: number, now: Date) {
+        const { id, characterId } = this.props
+        this.events.push({ type: 'CombatTurnPlayed', occurredAt: now, combatId: id, characterId, attacker, damage, characterHp, monsterHp })
+    }
+
+    private recordEnd(type: 'CombatWon' | 'CombatLost', now: Date) {
+        const { id, characterId, monsterTemplateId } = this.props
+        this.events.push({ type, occurredAt: now, combatId: id, characterId, monsterId: monsterTemplateId })
     }
 
     get snapshot(): Readonly<CombatProps> {

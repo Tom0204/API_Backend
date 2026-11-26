@@ -56,10 +56,10 @@ Clean Architecture et DDD, organisées **par contexte**. Détail et exemple de r
 |---|---|---|
 | `src/shared/` | Noyau commun : `DomainError`, paramètres de `rules.md`, ports `UnitOfWork`, `Clock`, `RandomSource` | rien |
 | `src/contexts/X/domain/` | Agrégats, objets-valeurs, règles de jeu, erreurs métier du contexte | `shared` |
-| `src/contexts/X/app/` | Cas d'usage (entrée, sortie, `execute`), `interfaces/` (repositories, outils, besoins envers les autres contextes), `services/` (ce que le contexte offre aux autres), `utils/` | son `domain`, `shared` |
+| `src/contexts/X/app/` | Cas d'usage (entrée, sortie, `execute`), `interfaces/` (repositories, outils, besoins envers les autres contextes), `services/` (ce que le contexte offre aux autres), `handlers/` (réactions aux événements), `utils/` | son `domain`, `shared` |
 | `src/contexts/X/api/` | Routes Express, schémas Zod, présentateurs | son `app`, `platform/http` |
 | `src/contexts/X/infra/` | Repositories Prisma, adaptateurs (Argon2, jetons) | son `app`, `platform/prisma` |
-| `src/platform/` | Express (`app.ts`, middlewares), Prisma (`UnitOfWork`), horloge, aléatoire, logs, et `transaction.ts` : seul endroit qui relie les contextes | tout |
+| `src/platform/` | Express (`app.ts`, middlewares), Prisma (`UnitOfWork`), publieur et registre des événements (`events/`), horloge, aléatoire, logs, et `transaction.ts` : seul endroit qui relie les contextes | tout |
 | `src/main.ts` | Composition : construit l'infrastructure et l'injecte | tout |
 
 **Aucun contexte n'importe un autre contexte** : il déclare ce dont il a besoin dans ses `app/interfaces`, et le contexte
@@ -70,8 +70,9 @@ qui possède la donnée le fournit par un service. Règle vérifiée par `tests/
 | `identity` | Comptes, sessions opaques de 24 h, authentification |
 | `characters` | Classes, personnages, statistiques calculées, progression (XP, niveaux) |
 | `world` | Zones et modèles de monstres, avec leur butin |
-| `combat` | Combat tour par tour, récompenses de victoire (XP et butin dans une seule transaction) |
+| `combat` | Combat tour par tour ; la victoire publie `CombatWon`, qui déclenche XP et butin dans la même transaction |
 | `inventory` | Inventaire d'un personnage, objets empilés par type |
+| `journal` | Journal des événements de jeu (création, combats, tours, récompenses), base de l'historique |
 
 ## Variables d'environnement
 

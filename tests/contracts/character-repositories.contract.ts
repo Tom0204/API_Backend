@@ -78,7 +78,7 @@ export function describeCharacterRepositoryContract(name: string, getContext: ()
             await ctx.unitOfWork.run(async ({ characters }) => {
                 const character = await characters.findByIdForUpdate(inserted.id)
                 if (!character) throw new Error('personnage absent')
-                character.gainExperience(390) // rules.md §5 : 390 XP depuis le niveau 1 → niveau 3 avec 7 XP
+                character.gainExperience(390, new Date()) // rules.md §5 : 390 XP depuis le niveau 1 → niveau 3 avec 7 XP
                 await characters.save(character)
             })
             const saved = await ctx.unitOfWork.run(({ characters }) => characters.findById(inserted.id))

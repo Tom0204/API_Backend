@@ -1,6 +1,6 @@
 import type { Combat, CombatStatus, TurnResult } from '../../domain/combat'
 import type { Combatant } from '../../domain/combatant'
-import type { LootedItem } from '../interfaces/combat-loot'
+import type { LootedItem } from '../interfaces/reward-events'
 
 export interface CombatantOutput {
     hp: number

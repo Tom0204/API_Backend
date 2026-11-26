@@ -10,18 +10,20 @@ collaboration entre contextes. Organisation : **Clean Architecture par contexte*
 src/
 ├── shared/                          # noyau commun : ne dépend d'aucun contexte
 │   ├── domain/                      # domain-error.ts, game-rules.ts (paramètres de rules.md)
-│   └── app/                         # unit-of-work.ts (UnitOfWork<R>), clock.ts, random-source.ts, auth-context.ts
+│   └── app/                         # unit-of-work.ts (UnitOfWork<R>), event-publisher.ts, clock.ts, random-source.ts, auth-context.ts
 ├── contexts/
 │   ├── identity/                    # comptes, sessions, authentification
 │   ├── characters/                  # classes, personnages, statistiques, progression
 │   ├── world/                       # zones, modèles de monstres et leur butin
 │   ├── combat/                      # combat tour par tour, récompenses de victoire
-│   └── inventory/                   # inventaires, piles d'objets
+│   ├── inventory/                   # inventaires, piles d'objets
+│   └── journal/                     # journal des événements de jeu
 │       ├── domain/                  # agrégats, objets-valeurs, règles, erreurs métier
 │       ├── app/
 │       │   ├── use-cases/           # un cas d'usage par fichier : entrée, sortie, execute
 │       │   ├── interfaces/          # repositories, outils, besoins envers un autre contexte
 │       │   ├── services/            # ce que le contexte offre aux autres
+│       │   ├── handlers/            # réactions aux événements de domaine
 │       │   └── utils/               # fonctions partagées par plusieurs cas d'usage
 │       ├── api/                     # routes, contrôleurs, schémas Zod, présentateurs
 │       └── infra/                   # repositories Prisma, adaptateurs (argon2, jetons)
@@ -30,6 +32,7 @@ src/
 │   ├── health/                      # GET /health (technique, hors contexte)
 │   ├── prisma/                      # client.ts, prisma-unit-of-work.ts, prisma-errors.ts, seed-reference-data.ts
 │   ├── system/  logging/            # system-clock.ts, crypto-random-source.ts, logger.ts
+│   ├── events/                      # event-publisher.ts (file FIFO), event-handlers.ts (registre ordonné)
 │   └── transaction.ts               # seul endroit qui relie les contextes
 ├── config/environment.ts
 └── main.ts                          # composition
@@ -166,7 +169,6 @@ export interface Fighter { id: string; zoneId: string; stats: CombatantStats }
 export interface CombatFighters {
     lockOwned(characterId: string, accountId: string): Promise<Fighter | undefined>
     isOwnedBy(characterId: string, accountId: string): Promise<boolean>
-    grantExperience(characterId: string, amount: number): Promise<ExperienceGain>
 }
 ```
 
@@ -182,7 +184,7 @@ export function createCombatFighters({ characters, classes }: { characters: Char
             const stats = Stats.forLevel(/* classe du personnage */, character.snapshot.progression.level)
             return { id: character.id, zoneId: character.snapshot.zoneId, stats: { maxHp: stats.hp, /* … */ } }
         },
-        // isOwnedBy, grantExperience (Character.gainExperience puis save)
+        // isOwnedBy
     }
 }
 ```
@@ -191,31 +193,68 @@ export function createCombatFighters({ characters, classes }: { characters: Char
 
 ```ts
 // src/platform/transaction.ts
-export function withContextServices(repositories: AppRepositories): AppTransaction {
+export function withContextServices(repositories: AppRepositories, handlers: readonly EventHandler<AppTransaction>[]): AppTransaction {
     const fighters: CombatFighters = createCombatFighters(repositories)
     const monsters: CombatMonsters = createCombatMonsters(repositories)
-    const loot: CombatLoot = createCombatLoot(repositories)
-    const characterOwners: CharacterOwners = createCharacterOwners(repositories)
-    return { ...repositories, fighters, monsters, loot, characterOwners }
+    // … characterOwners, monsterExperience, lootTables
+    const transaction: AppTransaction = { ...repositories, fighters, monsters, /* … */ events: createEventPublisher(handlers, () => transaction) }
+    return transaction
 }
 ```
 
-Contrats actuels : `combat` attend `CombatFighters` (characters), `CombatMonsters` (world) et `CombatLoot`
-(inventory) ; `inventory` attend `CharacterOwners` (characters). La fin de combat modifie trois agrégats dans **un
-seul** `UnitOfWork` : action, puis XP (verrou sur le personnage après celui du combat), puis butin.
+Contrats actuels : `combat` attend `CombatFighters` (characters) et `CombatMonsters` (world) ; `characters` attend
+`MonsterExperience` (world) ; `inventory` attend `CharacterOwners` (characters) et `LootTables` (world).
+
+### Événements de domaine
+
+Quand un contexte n'a pas à **demander** une donnée mais à **signaler** un fait, il publie un événement.
+Exemple : la victoire (EVT-02).
+
+**1. L'agrégat enregistre l'événement ; le cas d'usage le publie dans sa transaction :**
+
+```ts
+// src/contexts/combat/domain/combat.ts : à la transition VICTORY
+this.events.push({ type: 'CombatWon', occurredAt: now, combatId: id, characterId, monsterId: monsterTemplateId })
+
+// src/contexts/combat/app/use-cases/play-combat-action.ts
+const lastTurn = combat.attack(clock.now())
+await combats.save(combat)
+const published = await events.publish(combat.pullEvents()) // handlers exécutés ici, dans la même transaction
+const rewards = combat.snapshot.status === 'VICTORY' ? rewardsFromEvents(published, combat.id) : null
+```
+
+**2. Chaque contexte récepteur déclare la forme attendue et réagit, sans importer le combat :**
+
+```ts
+// src/contexts/characters/app/interfaces/combat-won.ts : contrat par le `type`, avec une garde
+export interface CombatWonEvent extends DomainEvent { type: 'CombatWon'; combatId: string; characterId: string; monsterId: string }
+export function isCombatWon(event: DomainEvent): event is CombatWonEvent
+
+// src/contexts/characters/app/handlers/grant-combat-experience.ts : XP, puis événements de suite
+handle: async (event, { characters, monsterExperience }) => {
+    // … gainExperience puis save (verrou sur le personnage après celui du combat)
+    return [granted, ...character.pullEvents()] // ExperienceGranted, CharacterLeveledUp
+}
+```
+
+**3. Seul `platform/events/event-handlers.ts` enregistre les handlers, dans un ordre fixe :**
+characters (XP) → inventory (butin) → journal (enregistre tout). Le publieur traite une file FIFO : les événements
+produits par un handler (`ExperienceGranted`, `LootAwarded`) passent après ceux déjà en file ; `publish` renvoie toute
+la cascade, d'où le combat compose la réponse (`rewards`). Un handler en échec annule toute la transaction ; un même
+événement ne peut être publié qu'une fois. La fin de combat modifie ainsi trois agrégats dans **un seul** `UnitOfWork`.
 
 ## 5. Infrastructure (`contexts/X/infra/`, `platform/prisma/`)
 
 ```ts
 // src/platform/prisma/prisma-unit-of-work.ts
-export function createPrismaUnitOfWork(prisma: PrismaClient): UnitOfWork<AppTransaction> {
+export function createPrismaUnitOfWork(prisma: PrismaClient, handlers: readonly EventHandler<AppTransaction>[]): UnitOfWork<AppTransaction> {
     return {
         run: (work) =>
             prisma.$transaction((tx) =>
                 work(withContextServices({
                     characters: createPrismaCharacterRepository(tx),
                     // … un repository par agrégat, tous sur la même transaction
-                }))
+                }, handlers))
             )
     }
 }
@@ -260,7 +299,8 @@ l'identité de la requête. Ainsi aucune route n'importe le contexte identity.
 ```ts
 // src/main.ts : seul fichier qui connaît toutes les implémentations.
 const prisma = createPrismaClient(env.DATABASE_URL)
-const unitOfWork = createPrismaUnitOfWork(prisma) // UnitOfWork<AppTransaction>, accepté par chaque cas d'usage
+const random = createCryptoRandomSource()
+const unitOfWork = createPrismaUnitOfWork(prisma, createEventHandlers({ random })) // accepté par chaque cas d'usage
 const app = createApp({
     createCharacter: createCreateCharacter({ unitOfWork, startingZoneId: await findStartingZoneId(prisma) }),
     // … un cas d'usage par route
@@ -296,5 +336,6 @@ Jamais `contexts/X` → `contexts/Y`. Paquets : aucun dans `shared`, `domain` et
 | Calcul entre deux participants sans état (dégâts) ? | Fonction pure du domaine (`contexts/combat/domain/damage.ts`) |
 | Droits, ordre des contrôles, transaction, plusieurs repositories ? | Cas d'usage |
 | Besoin d'une donnée d'un autre contexte ? | Contrat dans `X/app/interfaces`, service dans le contexte propriétaire, lien dans `platform/transaction.ts` |
+| Réagir à un fait d'un autre contexte ? | Événement du domaine émetteur, forme attendue dans `X/app/interfaces`, handler dans `X/app/handlers`, enregistré dans `platform/events/event-handlers.ts` |
 | Format d'entrée HTTP ? | Schéma Zod (`X/api/*.schemas.ts`) |
 | Forme de sortie ? | Sortie du cas d'usage (`X/app`) puis présentateur (`X/api`) |
