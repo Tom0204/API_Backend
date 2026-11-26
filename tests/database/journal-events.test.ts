@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createCreateCharacter } from '../../src/contexts/characters/app/use-cases/create-character'
+import { createGetCombatHistory } from '../../src/contexts/combat/app/use-cases/get-combat-history'
 import { createPlayCombatAction } from '../../src/contexts/combat/app/use-cases/play-combat-action'
 import { createStartCombat } from '../../src/contexts/combat/app/use-cases/start-combat'
 import { findStartingZoneId } from '../../src/contexts/world/infra/find-starting-zone-id'
@@ -83,6 +84,33 @@ describe('journal et événements sur PostgreSQL (EVT-01, EVT-03)', () => {
             'LootAwarded'
         ])
         expect(entries.at(-4)?.payload).toEqual({ attacker: 'CHARACTER', damage: 11, characterHp: 92, monsterHp: 0 })
+    })
+
+    it('historique du loup (PROD-01, exemple §8) : 8 coups dans l’ordre malgré des dates identiques', async () => {
+        const unitOfWork = createPrismaUnitOfWork(prisma, createEventHandlers({ random: new FixedRandom() }))
+        const accountId = await newAccount()
+        const character = await createCreateCharacter({ unitOfWork, startingZoneId, clock }).execute({ accountId, name: uniqueCharacterName(), classId: warriorId })
+        const { combat } = await createStartCombat({ unitOfWork, clock }).execute({ accountId, characterId: character.id, monsterId: monsterIds.wolf })
+        const play = createPlayCombatAction({ unitOfWork, clock })
+        for (let i = 0; i < 4; i += 1) await play.execute({ accountId, combatId: combat.id, type: 'ATTACK' })
+
+        const history = await createGetCombatHistory({ unitOfWork }).execute({ accountId, combatId: combat.id })
+        const stranger = await newAccount()
+
+        expect(history.status).toBe('VICTORY')
+        expect(history.turns.map(({ attacker, characterHp, monsterHp }) => [attacker, characterHp, monsterHp])).toEqual([
+            ['MONSTER', 113, 40],
+            ['CHARACTER', 113, 29],
+            ['MONSTER', 106, 29],
+            ['CHARACTER', 106, 18],
+            ['MONSTER', 99, 18],
+            ['CHARACTER', 99, 7],
+            ['MONSTER', 92, 7],
+            ['CHARACTER', 92, 0]
+        ])
+        await expect(
+            createGetCombatHistory({ unitOfWork }).execute({ accountId: stranger, combatId: combat.id })
+        ).rejects.toMatchObject({ code: 'COMBAT_NOT_FOUND' })
     })
 
     it('un handler en échec annule toute la transaction : ni personnage ni journal', async () => {

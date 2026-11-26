@@ -16,11 +16,13 @@ import type { ListZoneMonsters } from '../../contexts/world/app/use-cases/list-z
 import type { CharacterUseCases } from '../../contexts/characters/api/character.controller'
 import { createCharacterRoutes } from '../../contexts/characters/api/character.routes'
 import { createClassRoutes } from '../../contexts/characters/api/class.routes'
+import { createLeaderboardRoutes, type LeaderboardUseCases } from '../../contexts/characters/api/leaderboard.routes'
 import { type CombatUseCases, createCombatRoutes } from '../../contexts/combat/api/combat.routes'
 import { createHealthRoutes } from '../health/health.routes'
 import { createAuthRoutes } from '../../contexts/identity/api/auth.routes'
 import { createInventoryRoutes } from '../../contexts/inventory/api/inventory.routes'
 import { requireJsonContentType } from './middlewares/content-type'
+import { createDocsRoutes } from './openapi/docs.routes'
 import { errorHandler } from './middlewares/error-handler'
 import { notFound } from './middlewares/not-found'
 import { createRateLimiter, DEFAULT_RATE_LIMITS, type RateLimitPolicy } from './middlewares/rate-limit'
@@ -30,7 +32,7 @@ import { type AdminAccountUseCases, createAdminAccountRoutes } from '../../conte
 import { createWorldRoutes } from '../../contexts/world/api/world.routes'
 
 /** Un cas d'usage par route ; construits par `main.ts`, ou sur `tests/fakes/` dans les tests HTTP. */
-export interface UseCases extends CharacterUseCases, CombatUseCases, AdminAccountUseCases {
+export interface UseCases extends CharacterUseCases, LeaderboardUseCases, CombatUseCases, AdminAccountUseCases {
     checkHealth: CheckHealth
     registerAccount: RegisterAccount
     login: Login
@@ -50,6 +52,8 @@ export interface AppOptions {
     corsOrigins: string[]
     /** Remplaçables dans les tests pour atteindre la limite rapidement. */
     rateLimits?: { api: RateLimitPolicy; auth: RateLimitPolicy }
+    /** Swagger UI et spécification sur `/docs` (L8 D7) ; `main.ts` les désactive en production. */
+    apiDocs?: boolean
 }
 
 const JSON_BODY_LIMIT = '10kb'
@@ -65,6 +69,7 @@ export function createApp(useCases: UseCases, options: AppOptions): Express {
 
     // /health : avant la limitation et la lecture du corps (conventions.md §1).
     app.use(createHealthRoutes(useCases))
+    if (options.apiDocs === true) app.use(createDocsRoutes())
 
     app.use('/api/v1', createRateLimiter(rateLimits.api))
     app.use(requireJsonContentType)
@@ -83,6 +88,7 @@ export function createApp(useCases: UseCases, options: AppOptions): Express {
     app.use(createAdminAccountRoutes({ ...useCases, requirePermission }))
     app.use(createClassRoutes(useCases))
     app.use(createCharacterRoutes({ ...useCases, requirePlayer }))
+    app.use(createLeaderboardRoutes({ ...useCases, requirePlayer }))
     app.use(createWorldRoutes({ ...useCases, requirePlayer }))
     app.use(createCombatRoutes({ ...useCases, requirePlayer }))
     app.use(createInventoryRoutes({ ...useCases, requirePlayer }))

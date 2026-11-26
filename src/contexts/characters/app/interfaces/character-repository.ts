@@ -6,6 +6,11 @@ export interface CharacterRepository {
     findByIdForUpdate(id: string): Promise<Character | undefined>
     /** Personnages d'un compte, du plus ancien au plus récent. */
     findByAccount(accountId: string): Promise<Character[]>
+    /**
+     * Page du classement, tous comptes confondus (PROD-02, L8 D4) :
+     * niveau décroissant, XP décroissante, puis le plus ancien, puis l'identifiant.
+     */
+    findLeaderboardPage(page: { limit: number; offset: number }): Promise<Character[]>
     /** Dans une transaction : verrouille le compte, puis compte ses personnages. */
     countByAccountForUpdate(accountId: string): Promise<number>
     isNameTaken(normalizedName: string): Promise<boolean>

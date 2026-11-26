@@ -492,6 +492,15 @@ function createCharacterRepository(draft: InMemoryState): CharacterRepository {
                 .filter((record) => record.accountId === accountId)
                 .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
                 .map((record) => restoreCharacter(record)),
+        // Tri stable : à date égale, l'ordre d'insertion (équivalent des UUID v7 croissants).
+        findLeaderboardPage: async ({ limit, offset }) =>
+            [...draft.characters]
+                .sort(
+                    (a, b) =>
+                        b.level - a.level || b.experience - a.experience || a.createdAt.getTime() - b.createdAt.getTime()
+                )
+                .slice(offset, offset + limit)
+                .map((record) => restoreCharacter(record)),
         // Les unités de travail sont déjà exécutées l'une après l'autre : équivalent du verrou sur le compte.
         countByAccountForUpdate: async (accountId) =>
             draft.characters.filter((record) => record.accountId === accountId).length,

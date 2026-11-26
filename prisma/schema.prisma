@@ -150,6 +150,8 @@ model Character {
   gameEvents GameEvent[]
 
   @@index([accountId])
+  /// Classement (PROD-02, L8 D4) : même ordre que la requête, pagination sans tri en mémoire.
+  @@index([level(sort: Desc), experience(sort: Desc), createdAt, id], map: "characters_leaderboard_idx")
   @@map("characters")
 }
 

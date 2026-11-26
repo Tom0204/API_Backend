@@ -16,9 +16,10 @@ src/generated/
 postman/*
 !postman/mmorpg-api.postman_collection.json
 
-# Outillage de l'agent IA (gardé en local, hors du dépôt) ; AGENTS.md reste versionné : il porte les règles du projet
+# Outillage de l'agent IA (gardé en local, hors du dépôt)
 .claude/
 CLAUDE.md
+AGENTS.md
 GUIDE.md
 .claude/settings.local.json
 

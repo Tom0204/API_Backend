@@ -23,8 +23,8 @@ Hors projet : voir `docs/rules.md` §1.
 | 4 | L4 Récompenses et livraison | REWARD-01, INV-01, DOC-01, QUAL-01 | Parcours complet, collection Postman, README | ✅ | 18f8130 |
 | 5 | L5 Événements de domaine | EVT-01 à EVT-03 | Événements de combats et journal en jeu | ✅ | 80861ea |
 | 6 | L6 Renforcement de l'authentification | AUTH-01 à AUTH-03 | Jetons d'accès et de rafraîchissement, déconnexion, verrouillage après échecs de connexion | ✅ | c6596d3 |
-| 7 | L7 Rôles et administration | ROLE-01 à ROLE-03 | Permissions, contrôle centralisé et administration des comptes | ✅ | - |
-| 8 | L8 Produit et documentation | PROD-01, PROD-02, DOC-02, QUAL-02 | Historique d'un combat, classement des personnages, documentation et revue | ⏳ | - |
+| 7 | L7 Rôles et administration | ROLE-01 à ROLE-03 | Permissions, contrôle centralisé et administration des comptes | ✅ | 9fe8db4 |
+| 8 | L8 Produit et documentation | PROD-01, PROD-02, DOC-02, QUAL-02 | Historique d'un combat, classement des personnages, documentation et revue | ✅ | - |
 
 Chaque journée garde environ 1 h de marge. Décisions de chaque lot : `docs/lots/LN.md`.
 
@@ -307,35 +307,35 @@ Format : **Objectif**, **Critères** (3 à 5), **Tests**. Les exemples chiffrés
 ### Jour 8 — Produit et documentation
 
 #### PROD-01 — Historique d'un combat
-**Statut :** ⏳ · **Dépend de :** EVT-03 · **Règles :** §6
+**Statut :** ✅ · **Dépend de :** EVT-03 · **Règles :** §6
 **Objectif :** `GET /api/v1/combats/:combatId/history` : les tours dans l'ordre (attaquant, dégâts, PV restants).
 **Critères :**
-- [ ] Construit à partir du journal (EVT-03) ; combat en cours ou terminé.
-- [ ] Combat d'un autre joueur → même 404 `COMBAT_NOT_FOUND` qu'un inexistant.
+- [x] Construit à partir du journal (EVT-03) ; combat en cours ou terminé.
+- [x] Combat d'un autre joueur → même 404 `COMBAT_NOT_FOUND` qu'un inexistant.
 **Tests :** historique de l'exemple §8 (4 actions, 92 PV), isolation entre joueurs.
 
 #### PROD-02 — Classement des personnages
-**Statut :** ⏳ · **Dépend de :** CHAR-04 · **Règles :** §5
+**Statut :** ✅ · **Dépend de :** CHAR-04 · **Règles :** §5
 **Objectif :** `GET /api/v1/leaderboard` : personnages triés par niveau puis XP.
 **Critères :**
-- [ ] Pagination et départage des égalités définis à l'audit (exception à `docs/conventions.md` §3).
-- [ ] Aucun identifiant de compte exposé.
+- [x] Pagination et départage des égalités définis à l'audit (exception à `docs/conventions.md` §3).
+- [x] Aucun identifiant de compte exposé.
 **Tests :** tri, égalités, pagination, paramètre inconnu → 400.
 
 #### DOC-02 — Documentation OpenAPI
-**Statut :** ⏳ · **Dépend de :** PROD-02
+**Statut :** ✅ · **Dépend de :** PROD-02
 **Objectif :** spécification OpenAPI 3.1 de toutes les routes, servie sur `/docs` (Swagger UI).
 **Critères :**
-- [ ] Un test échoue si une route de l'application est absente de la spécification.
-- [ ] Enveloppes de succès et d'erreur décrites une seule fois et réutilisées.
+- [x] Un test échoue si une route de l'application est absente de la spécification.
+- [x] Enveloppes de succès et d'erreur décrites une seule fois et réutilisées.
 **Tests :** couverture des routes, `/docs` répond.
 
 #### QUAL-02 — Revue finale
-**Statut :** ⏳ · **Dépend de :** DOC-02
+**Statut :** ✅ · **Dépend de :** DOC-02
 **Objectif :** vérifier la qualité de l'ensemble avant la livraison.
 **Critères :**
-- [ ] `/verifier` entièrement au vert ; revue `relecteur` sur tout le projet, problèmes corrigés ou listés.
-- [ ] Collection Postman (L5 à L8) exécutée par le Runner sur une base fraîchement initialisée ; README à jour.
+- [x] `/verifier` entièrement au vert ; revue `relecteur` sur tout le projet, problèmes corrigés ou listés (`docs/lots/L8.md`).
+- [x] Collection Postman (L5 à L8) exécutée par le Runner sur une base fraîchement initialisée ; README à jour.
 **Tests :** exécution complète.
 
 ---

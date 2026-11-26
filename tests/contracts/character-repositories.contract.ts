@@ -86,6 +86,37 @@ export function describeCharacterRepositoryContract(name: string, getContext: ()
             expect(saved?.snapshot.progression).toMatchObject({ level: 3, experience: 7 })
         })
 
+        it('classement : niveau puis XP décroissants, puis le plus ancien ; pages cohérentes (L8 D4)', async () => {
+            const ctx = getContext()
+            const accountId = await ctx.createAccount()
+            const insertWithXp = async (xp: number) => {
+                const inserted = await ctx.unitOfWork.run(({ characters }) => characters.insert(newCharacter(ctx, accountId)))
+                await ctx.unitOfWork.run(async ({ characters }) => {
+                    const character = await characters.findByIdForUpdate(inserted.id)
+                    if (!character) throw new Error('personnage absent')
+                    character.gainExperience(xp, new Date())
+                    await characters.save(character)
+                })
+                return inserted.id
+            }
+            // rules.md §5 : 390 XP → niveau 3 avec 7 XP ; 403 XP → niveau 3 avec 20 XP ; 11 106 XP → niveau 10.
+            const olderTie = await insertWithXp(390)
+            const newerTie = await insertWithXp(390)
+            const moreXp = await insertWithXp(403)
+            const maxLevel = await insertWithXp(11_106)
+            const mine = new Set([olderTie, newerTie, moreXp, maxLevel])
+
+            const all = await ctx.unitOfWork.run(({ characters }) => characters.findLeaderboardPage({ limit: 100, offset: 0 }))
+            const page = await ctx.unitOfWork.run(({ characters }) => characters.findLeaderboardPage({ limit: 2, offset: 1 }))
+            const beyond = await ctx.unitOfWork.run(({ characters }) =>
+                characters.findLeaderboardPage({ limit: 10, offset: all.length })
+            )
+
+            expect(all.map((c) => c.id).filter((id) => mine.has(id))).toEqual([maxLevel, moreXp, olderTie, newerTie])
+            expect(page.map((c) => c.id)).toEqual(all.slice(1, 3).map((c) => c.id))
+            expect(beyond).toEqual([])
+        })
+
         it('insertion d’un nom déjà pris (autre casse) → CHARACTER_NAME_TAKEN', async () => {
             const ctx = getContext()
             const accountId = await ctx.createAccount()

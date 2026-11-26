@@ -1990,6 +1990,306 @@
           ]
         }
       ]
+    },
+    {
+      "name": "L8 — Produit et documentation",
+      "item": [
+        {
+          "name": "Joueur — reconnexion après réactivation",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token', pm.response.json().data.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historique du combat contre le loup",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/combats/{{combatId}}/history",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, 8 coups dans l’ordre, victoire avec 92 PV (rules.md §8)', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data.status).to.eql('VICTORY');",
+                  "    pm.expect(data.turns).to.have.length(8);",
+                  "    pm.expect(data.turns[0]).to.eql({ number: 1, attacker: 'MONSTER', damage: 7, characterHp: 113, monsterHp: 40 });",
+                  "    pm.expect(data.turns[7]).to.eql({ number: 8, attacker: 'CHARACTER', damage: 11, characterHp: 92, monsterHp: 0 });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historique d'un combat d'un autre joueur (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/combats/{{combatId}}/history",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 COMBAT_NOT_FOUND', () => {",
+                  "    pm.response.to.have.status(404);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('COMBAT_NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historique — identifiant invalide (400)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/combats/abc/history",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 VALIDATION_ERROR', () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Classement",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/leaderboard?limit=100",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, trié par niveau puis XP, rangs consécutifs, aucun identifiant', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const rows = pm.response.json().data;",
+                  "    pm.expect(rows.length).to.be.above(0);",
+                  "    rows.forEach((row, index) => {",
+                  "        pm.expect(row).to.have.keys('rank', 'name', 'classId', 'level', 'experience');",
+                  "        pm.expect(row.rank).to.eql(index + 1);",
+                  "        const previous = rows[index - 1];",
+                  "        if (previous) pm.expect(previous.level > row.level || (previous.level === row.level && previous.experience >= row.experience)).to.be.true;",
+                  "    });",
+                  "    pm.expect(rows.map((row) => row.name)).to.include(pm.collectionVariables.get('characterName'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Classement — deuxième ligne (limit=1&offset=1)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/leaderboard?limit=1&offset=1",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, une ligne de rang 2', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const rows = pm.response.json().data;",
+                  "    pm.expect(rows.length).to.be.at.most(1);",
+                  "    if (rows.length === 1) pm.expect(rows[0].rank).to.eql(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Classement — paramètre inconnu (400)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/leaderboard?page=2",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400, champ page refusé', () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.json().error.details).to.eql([{ field: 'page', message: 'Unknown field' }]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Classement — limit hors bornes (400)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/leaderboard?limit=101",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 VALIDATION_ERROR', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Classement — sans jeton (401)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/leaderboard",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('401 UNAUTHENTICATED', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Spécification OpenAPI (public)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/docs/openapi.json",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('200, OpenAPI 3.1 avec les routes du L8', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "    const spec = pm.response.json();",
+                  "    pm.expect(spec.openapi).to.eql('3.1.0');",
+                  "    pm.expect(spec.paths).to.have.property('/api/v1/leaderboard');",
+                  "    pm.expect(spec.paths).to.have.property('/api/v1/combats/{combatId}/history');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

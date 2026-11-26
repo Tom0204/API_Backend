@@ -1,16 +1,18 @@
 # Conventions de l'API
 
 Contrat HTTP commun à tous les endpoints. Le **catalogue des routes** n'est pas tenu ici : il vit dans la
-collection Postman (`postman/`), mise à jour à chaque lot.
+spécification OpenAPI (`src/platform/http/openapi/`, servie sur `/docs`) et dans la collection Postman (`postman/`).
 
 ## 1. Routes
 
 - Toutes les routes métier sont sous `/api/v1`. `GET /health` est hors préfixe et non limité.
+- `/docs` (Swagger UI) et `/docs/openapi.json` : publics, hors préfixe, non limités, absents quand `NODE_ENV=production`
+  (`docs/lots/L8.md` D7).
 - **Publiques :** `GET /health`, `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`,
   `GET /api/v1/classes`.
   **Toutes les autres** exigent `Authorization: Bearer <jeton d’accès>` ; sinon 401 avec `WWW-Authenticate: Bearer realm="api"`.
 - **Permissions** (ROLE-02, `docs/lots/L7.md` D1-D2), relues en base à chaque requête : `PLAY` pour les routes de jeu
-  (personnages, zones, combats, inventaire) ; `/api/v1/admin/*` exige la permission propre à chaque route ; sinon 403.
+  (personnages, classement, zones, combats, inventaire) ; `/api/v1/admin/*` exige la permission propre à chaque route ; sinon 403.
 - Le jeton de rafraîchissement ne sert qu’à `POST /api/v1/auth/refresh` (corps `{ "refreshToken" }`), jamais en `Bearer`.
   Jeton inconnu, expiré, révoqué ou déjà utilisé : même 401 `UNAUTHENTICATED`.
 
@@ -37,7 +39,9 @@ collection Postman (`postman/`), mise à jour à chaque lot.
 ```
 
 - `201` pour une création (ressource dans `data`) ; `204` sans corps pour une déconnexion (seule exception à l'enveloppe).
-- Une liste est un tableau dans `data` ; vide → `200` avec `[]`. Pas de pagination dans ce projet (listes courtes).
+- Une liste est un tableau dans `data` ; vide → `200` avec `[]`. Pas de pagination dans ce projet (listes courtes),
+  **sauf** `GET /api/v1/leaderboard` : `?limit=` de 1 à 100 (20 par défaut) et `?offset=` ≥ 0 (0 par défaut) ;
+  `data` reste un tableau, sans total (`docs/lots/L8.md` D3).
 - Chaque ressource passe par un présentateur (liste blanche de champs). Les champs prévus sont toujours présents (`null` si vides).
 - Dates en ISO 8601 UTC (`2026-11-17T11:43:00.000Z`), champs suffixés `At`.
 

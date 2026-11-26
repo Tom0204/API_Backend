@@ -28,6 +28,16 @@ export function createPrismaCharacterRepository(tx: Prisma.TransactionClient): C
             return rows.map(toCharacter)
         },
 
+        async findLeaderboardPage({ limit, offset }) {
+            // Même ordre que l'index characters_leaderboard_idx : départage total, pagination stable.
+            const rows = await tx.character.findMany({
+                orderBy: [{ level: 'desc' }, { experience: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
+                skip: offset,
+                take: limit
+            })
+            return rows.map(toCharacter)
+        },
+
         async countByAccountForUpdate(accountId) {
             // Verrou réel : la seconde transaction attend que la première soit validée, puis compte à nouveau.
             await tx.$queryRaw`SELECT id FROM accounts WHERE id = ${accountId}::uuid FOR UPDATE`

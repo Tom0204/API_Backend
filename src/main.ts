@@ -1,8 +1,10 @@
 import { createCreateCharacter } from './contexts/characters/app/use-cases/create-character'
 import { createGetCharacterStats } from './contexts/characters/app/use-cases/get-character-stats'
+import { createGetLeaderboard } from './contexts/characters/app/use-cases/get-leaderboard'
 import { createGetMyCharacter } from './contexts/characters/app/use-cases/get-my-character'
 import { createListClasses } from './contexts/characters/app/use-cases/list-classes'
 import { createListMyCharacters } from './contexts/characters/app/use-cases/list-my-characters'
+import { createGetCombatHistory } from './contexts/combat/app/use-cases/get-combat-history'
 import { createGetMyCombat } from './contexts/combat/app/use-cases/get-my-combat'
 import { createPlayCombatAction } from './contexts/combat/app/use-cases/play-combat-action'
 import { createStartCombat } from './contexts/combat/app/use-cases/start-combat'
@@ -72,13 +74,15 @@ async function main(): Promise<void> {
             listMyCharacters: createListMyCharacters({ unitOfWork }),
             getMyCharacter: createGetMyCharacter({ unitOfWork }),
             getCharacterStats: createGetCharacterStats({ unitOfWork }),
+            getLeaderboard: createGetLeaderboard({ unitOfWork }),
             listZoneMonsters: createListZoneMonsters({ unitOfWork }),
             startCombat: createStartCombat({ unitOfWork, clock }),
             playCombatAction: createPlayCombatAction({ unitOfWork, clock }),
             getMyCombat: createGetMyCombat({ unitOfWork }),
+            getCombatHistory: createGetCombatHistory({ unitOfWork }),
             getMyInventory: createGetMyInventory({ unitOfWork })
         },
-        { logger, corsOrigins: env.CORS_ORIGINS }
+        { logger, corsOrigins: env.CORS_ORIGINS, apiDocs: env.NODE_ENV !== 'production' }
     )
 
     const server = app.listen(env.PORT, () => {

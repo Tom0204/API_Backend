@@ -202,7 +202,7 @@ export function withContextServices(repositories: AppRepositories, handlers: rea
 }
 ```
 
-Contrats actuels : `combat` attend `CombatFighters` (characters) et `CombatMonsters` (world) ; `characters` attend
+Contrats actuels : `combat` attend `CombatFighters` (characters), `CombatMonsters` (world) et `CombatJournal` (journal) ; `characters` attend
 `MonsterExperience` (world) ; `inventory` attend `CharacterOwners` (characters) et `LootTables` (world).
 
 ### Événements de domaine

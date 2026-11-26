@@ -2,9 +2,11 @@ import { Writable } from 'node:stream'
 import { pino } from 'pino'
 import { createCreateCharacter } from '../../src/contexts/characters/app/use-cases/create-character'
 import { createGetCharacterStats } from '../../src/contexts/characters/app/use-cases/get-character-stats'
+import { createGetLeaderboard } from '../../src/contexts/characters/app/use-cases/get-leaderboard'
 import { createGetMyCharacter } from '../../src/contexts/characters/app/use-cases/get-my-character'
 import { createListClasses } from '../../src/contexts/characters/app/use-cases/list-classes'
 import { createListMyCharacters } from '../../src/contexts/characters/app/use-cases/list-my-characters'
+import { createGetCombatHistory } from '../../src/contexts/combat/app/use-cases/get-combat-history'
 import { createGetMyCombat } from '../../src/contexts/combat/app/use-cases/get-my-combat'
 import { createPlayCombatAction } from '../../src/contexts/combat/app/use-cases/play-combat-action'
 import { createStartCombat } from '../../src/contexts/combat/app/use-cases/start-combat'
@@ -65,13 +67,15 @@ export function buildTestApp(overrides: Partial<Omit<AppOptions, 'logger'>> = {}
             listMyCharacters: createListMyCharacters(deps),
             getMyCharacter: createGetMyCharacter(deps),
             getCharacterStats: createGetCharacterStats(deps),
+            getLeaderboard: createGetLeaderboard(deps),
             listZoneMonsters: createListZoneMonsters(deps),
             startCombat: createStartCombat(deps),
             playCombatAction: createPlayCombatAction(deps),
             getMyCombat: createGetMyCombat(deps),
+            getCombatHistory: createGetCombatHistory(deps),
             getMyInventory: createGetMyInventory(deps)
         },
-        { logger, corsOrigins: [], ...overrides }
+        { logger, corsOrigins: [], apiDocs: true, ...overrides }
     )
 
     return { app, database, passwordHasher, tokenGenerator, clock, random, logLines }

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createCreateCharacter } from '../../../../src/contexts/characters/app/use-cases/create-character'
 import { createGetCharacterStats } from '../../../../src/contexts/characters/app/use-cases/get-character-stats'
+import { createGetLeaderboard } from '../../../../src/contexts/characters/app/use-cases/get-leaderboard'
 import { createGetMyCharacter } from '../../../../src/contexts/characters/app/use-cases/get-my-character'
 import { createListClasses } from '../../../../src/contexts/characters/app/use-cases/list-classes'
 import { createListMyCharacters } from '../../../../src/contexts/characters/app/use-cases/list-my-characters'
@@ -26,6 +27,24 @@ function setup() {
         getCharacterStats: createGetCharacterStats(deps)
     }
 }
+
+describe('GetLeaderboard', () => {
+    it('rang = décalage + position ; ni identifiant ni propriétaire en sortie', async () => {
+        const ctx = setup()
+        const accountId = await ctx.createAccount()
+        for (const name of ['Thrall', 'Jaina', 'Varian']) {
+            await ctx.createCharacter.execute({ accountId, name, classId: ctx.warrior })
+        }
+        const getLeaderboard = createGetLeaderboard({ unitOfWork: ctx.database })
+
+        const page = await getLeaderboard.execute({ limit: 2, offset: 1 })
+
+        expect(page).toEqual([
+            { rank: 2, name: 'Jaina', classId: ctx.warrior, level: 1, experience: 0 },
+            { rank: 3, name: 'Varian', classId: ctx.warrior, level: 1, experience: 0 }
+        ])
+    })
+})
 
 describe('ListClasses', () => {
     it('renvoie les 3 classes triées par nom', async () => {

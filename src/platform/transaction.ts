@@ -4,6 +4,7 @@ import type { MonsterExperience } from '../contexts/characters/app/interfaces/mo
 import { createCharacterOwners } from '../contexts/characters/app/services/character-owners'
 import { createCombatFighters } from '../contexts/characters/app/services/combat-fighters'
 import type { CombatFighters } from '../contexts/combat/app/interfaces/combat-fighters'
+import type { CombatJournal } from '../contexts/combat/app/interfaces/combat-journal'
 import type { CombatMonsters } from '../contexts/combat/app/interfaces/combat-monsters'
 import type { CombatRepository } from '../contexts/combat/app/interfaces/combat-repository'
 import type { AccountRepository } from '../contexts/identity/app/interfaces/account-repository'
@@ -12,6 +13,7 @@ import type { CharacterOwners } from '../contexts/inventory/app/interfaces/chara
 import type { InventoryRepository } from '../contexts/inventory/app/interfaces/inventory-repository'
 import type { LootTables } from '../contexts/inventory/app/interfaces/loot-tables'
 import type { JournalRepository } from '../contexts/journal/app/interfaces/journal-repository'
+import { createCombatJournal } from '../contexts/journal/app/services/combat-journal'
 import type { WorldRepository } from '../contexts/world/app/interfaces/world-repository'
 import { createCombatMonsters } from '../contexts/world/app/services/combat-monsters'
 import { createLootTables } from '../contexts/world/app/services/loot-tables'
@@ -35,6 +37,7 @@ export interface AppRepositories {
 export interface AppTransaction extends AppRepositories {
     fighters: CombatFighters
     monsters: CombatMonsters
+    combatJournal: CombatJournal
     characterOwners: CharacterOwners
     monsterExperience: MonsterExperience
     lootTables: LootTables
@@ -52,6 +55,7 @@ export function withContextServices(
 ): AppTransaction {
     const fighters: CombatFighters = createCombatFighters(repositories)
     const monsters: CombatMonsters = createCombatMonsters(repositories)
+    const combatJournal: CombatJournal = createCombatJournal(repositories)
     const characterOwners: CharacterOwners = createCharacterOwners(repositories)
     const monsterExperience: MonsterExperience = createMonsterExperience(repositories)
     const lootTables: LootTables = createLootTables(repositories)
@@ -59,6 +63,7 @@ export function withContextServices(
         ...repositories,
         fighters,
         monsters,
+        combatJournal,
         characterOwners,
         monsterExperience,
         lootTables,

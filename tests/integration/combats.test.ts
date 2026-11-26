@@ -217,3 +217,66 @@ describe('POST /api/v1/combats/:combatId/actions et GET /api/v1/combats/:combatI
         expect((await request(ctx.app).post(`/api/v1/combats/${randomUUID()}/actions`).send({ type: 'ATTACK' })).status).toBe(401)
     })
 })
+
+describe('GET /api/v1/combats/:combatId/history (PROD-01)', () => {
+    const WOLF_EXAMPLE_TURNS = [
+        { number: 1, attacker: 'MONSTER', damage: 7, characterHp: 113, monsterHp: 40 },
+        { number: 2, attacker: 'CHARACTER', damage: 11, characterHp: 113, monsterHp: 29 },
+        { number: 3, attacker: 'MONSTER', damage: 7, characterHp: 106, monsterHp: 29 },
+        { number: 4, attacker: 'CHARACTER', damage: 11, characterHp: 106, monsterHp: 18 },
+        { number: 5, attacker: 'MONSTER', damage: 7, characterHp: 99, monsterHp: 18 },
+        { number: 6, attacker: 'CHARACTER', damage: 11, characterHp: 99, monsterHp: 7 },
+        { number: 7, attacker: 'MONSTER', damage: 7, characterHp: 92, monsterHp: 7 },
+        { number: 8, attacker: 'CHARACTER', damage: 11, characterHp: 92, monsterHp: 0 }
+    ]
+
+    it('exemple §8 : 4 actions du guerrier, 8 coups dans l’ordre, VICTORY avec 92 PV', async () => {
+        const ctx = await setup()
+        const started = await ctx.start(ctx.alice.token, { characterId: ctx.alice.characterId, monsterId: ctx.database.monsterId('wolf') })
+        const combatId: string = started.body.data.id
+        for (let i = 0; i < 4; i += 1) await ctx.act(ctx.alice.token, combatId)
+
+        const response = await ctx.get(ctx.alice.token, `/api/v1/combats/${combatId}/history`)
+
+        expect(response.status).toBe(200)
+        expect(response.body).toEqual({
+            success: true,
+            message: 'Combat history retrieved successfully',
+            data: { combatId, status: 'VICTORY', turns: WOLF_EXAMPLE_TURNS }
+        })
+    })
+
+    it('combat en cours : les coups déjà joués', async () => {
+        const ctx = await setup()
+        const started = await ctx.start(ctx.alice.token, { characterId: ctx.alice.characterId, monsterId: ctx.database.monsterId('wolf') })
+        await ctx.act(ctx.alice.token, started.body.data.id)
+
+        const response = await ctx.get(ctx.alice.token, `/api/v1/combats/${started.body.data.id}/history`)
+
+        expect(response.body.data).toEqual({ combatId: started.body.data.id, status: 'IN_PROGRESS', turns: WOLF_EXAMPLE_TURNS.slice(0, 3) })
+    })
+
+    it("combat d'un autre joueur ou inexistant → 404 COMBAT_NOT_FOUND identiques", async () => {
+        const ctx = await setup()
+        const bob = await ctx.player('bob@example.com', 'Thrall')
+        const started = await ctx.start(bob.token, { characterId: bob.characterId, monsterId: ctx.database.monsterId('wolf') })
+
+        const other = await ctx.get(ctx.alice.token, `/api/v1/combats/${started.body.data.id}/history`)
+        const missing = await ctx.get(ctx.alice.token, `/api/v1/combats/${randomUUID()}/history`)
+        const own = await ctx.get(bob.token, `/api/v1/combats/${started.body.data.id}/history`)
+
+        expect(other.status).toBe(404)
+        expect(other.body).toEqual(missing.body)
+        expect(other.body).toEqual({ success: false, message: 'Combat not found', error: { code: 'COMBAT_NOT_FOUND', details: [] } })
+        expect(own.status).toBe(200)
+    })
+
+    it('400 sur un combatId invalide ou un paramètre de requête, 401 sans jeton', async () => {
+        const ctx = await setup()
+        const started = await ctx.start(ctx.alice.token, { characterId: ctx.alice.characterId, monsterId: ctx.database.monsterId('wolf') })
+
+        expect((await ctx.get(ctx.alice.token, '/api/v1/combats/abc/history')).status).toBe(400)
+        expect((await ctx.get(ctx.alice.token, `/api/v1/combats/${started.body.data.id}/history?from=2`)).status).toBe(400)
+        expect((await request(ctx.app).get(`/api/v1/combats/${randomUUID()}/history`)).status).toBe(401)
+    })
+})
