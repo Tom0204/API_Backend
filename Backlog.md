@@ -211,12 +211,127 @@ Format : **Objectif**, **Critères** (3 à 5), **Tests**. Les exemples chiffrés
 - [x] Propriété vérifiée sur chaque route ; aucune donnée sensible exposée ou journalisée.
 **Tests :** exécution complète.
 
+### Jour 5 — Événements de domaine
+
+#### EVT-01 — Événements de domaine et publication
+**Statut :** ⏳ · **Dépend de :** QUAL-01
+**Objectif :** les agrégats enregistrent des événements ; le cas d'usage les publie dans sa transaction.
+**Critères :**
+- [ ] Événements immuables nommés au passé (`CombatWon`…), déclarés dans le domaine du contexte émetteur ; un handler déclare dans ses `app/interfaces` la forme qu'il attend (aucun import entre contextes).
+- [ ] Port de publication dans `shared/app` ; handlers enregistrés uniquement dans `platform/` ; exécution synchrone dans le `UnitOfWork` : un handler en échec annule toute la transaction.
+- [ ] Ordre des handlers déterministe ; un événement n'est publié qu'une fois.
+- [ ] `tests/architecture.test.ts` couvre les handlers.
+**Tests :** publication et ordre ; annulation si un handler échoue (mémoire et PostgreSQL).
+
+#### EVT-02 — Victoire par l'événement `CombatWon`
+**Statut :** ⏳ · **Dépend de :** EVT-01 · **Règles :** §5, §7
+**Objectif :** remplacer l'appel direct des récompenses par `CombatWon` et deux handlers (characters : XP ; inventory : butin). Reprend BONUS-03.
+**Critères :**
+- [ ] `Combat` émet `CombatWon` à la transition `VICTORY` ; une défaite n'émet aucun événement de récompense.
+- [ ] Handler characters : XP, avec l'ordre des verrous combat → personnage conservé ; handler inventory : tirage par `RandomSource` et ajout du butin.
+- [ ] Contrats `CombatFighters.grantExperience` et `CombatLoot` supprimés ; réponse finale inchangée (`rewards`, L4 D2).
+- [ ] Les tests de REWARD-01 passent sans changer leurs valeurs (une seule attribution, panne injectée, concurrence).
+**Tests :** suite REWARD-01 ; chaque handler isolément.
+
+#### EVT-03 — Journal des événements de jeu
+**Statut :** ⏳ · **Dépend de :** EVT-02
+**Objectif :** un handler enregistre les événements de jeu dans un journal, base de l'historique de combat (PROD-01).
+**Critères :**
+- [ ] Au moins : création de personnage, passage de niveau, début, tours et fin de combat.
+- [ ] Table de journal (migration) écrite dans la même transaction ; date fournie par `Clock`.
+- [ ] Aucune donnée sensible dans le journal.
+**Tests :** journal d'un parcours complet ; annulation avec la transaction.
+
+### Jour 6 — Authentification renforcée
+
+#### AUTH-01 — Jeton d'accès et jeton de rafraîchissement
+**Statut :** ⏳ · **Dépend de :** ID-03
+**Objectif :** jeton d'accès court et jeton de rafraîchissement à usage unique, `POST /api/v1/auth/refresh`.
+**Critères :**
+- [ ] La connexion renvoie les deux jetons ; seules leurs empreintes sont stockées ; durées en paramètres.
+- [ ] Rotation : un rafraîchissement invalide l'ancien jeton et en émet un nouveau, dans une transaction verrouillée.
+- [ ] Réutilisation d'un jeton déjà utilisé → toute la famille de sessions est révoquée, 401.
+- [ ] Jeton d'accès expiré → 401 `UNAUTHENTICATED` ; `/auth/me` inchangé.
+**Tests :** rotation, réutilisation, expiration (horloge de test) ; PostgreSQL : 2 rafraîchissements simultanés → 1 seul succès.
+
+#### AUTH-02 — Déconnexion
+**Statut :** ⏳ · **Dépend de :** AUTH-01
+**Objectif :** `POST /api/v1/auth/logout` (204) révoque la session courante ; déconnexion de toutes les sessions du compte. Reprend BONUS-01.
+**Critères :**
+- [ ] Après déconnexion, le jeton d'accès et le jeton de rafraîchissement → 401.
+- [ ] La déconnexion simple laisse les autres sessions actives ; 204 sans corps.
+**Tests :** les deux déconnexions, isolation entre sessions.
+
+#### AUTH-03 — Verrouillage après échecs de connexion
+**Statut :** ⏳ · **Dépend de :** AUTH-01
+**Objectif :** verrouiller temporairement un compte après plusieurs échecs consécutifs, en plus de la limite par IP.
+**Critères :**
+- [ ] Seuil et durée en paramètres ; une connexion réussie remet le compteur à zéro.
+- [ ] Aucune énumération des comptes : même réponse pour un email inconnu.
+- [ ] Échecs comptés même lors de connexions simultanées.
+**Tests :** seuil, déverrouillage par l'horloge, remise à zéro ; PostgreSQL : échecs simultanés.
+
+### Jour 7 — Rôles et administration
+
+#### ROLE-01 — Permissions en masque de bits
+**Statut :** ⏳ · **Dépend de :** ID-03
+**Objectif :** objet-valeur `Permissions` : flags `1 << n` et rôles nommés comme combinaisons de flags.
+**Critères :**
+- [ ] Flags et rôles déclarés à un seul endroit ; `has` (`&`), `grant` (`|`), `revoke` (`& ~`) ; masque contenant un bit inconnu refusé à la construction.
+- [ ] Colonne de permissions sur le compte (migration, contrainte CHECK) ; tout nouveau compte reçoit le rôle joueur.
+- [ ] Premier administrateur créé par le seed à partir de variables d'environnement, jamais en dur.
+**Tests :** opérations sur les bits, rôles, seed idempotent.
+
+#### ROLE-02 — Contrôle centralisé des permissions
+**Statut :** ⏳ · **Dépend de :** ROLE-01
+**Objectif :** une seule fonction de contrôle, appelée par un middleware `requirePermission(...)`.
+**Critères :**
+- [ ] Permissions relues à chaque requête (pas dans le jeton) : un retrait de droit prend effet immédiatement.
+- [ ] Nouveau `kind` `FORBIDDEN` → 403, ajouté à `docs/conventions.md`.
+- [ ] Aucune vérification de rôle dispersée en `if` dans les cas d'usage ou les routes.
+**Tests :** 403 sans la permission, accès avec, retrait immédiat.
+
+#### ROLE-03 — Administration des comptes
+**Statut :** ⏳ · **Dépend de :** ROLE-02, AUTH-02
+**Objectif :** routes `/api/v1/admin/accounts` : lister les comptes, suspendre ou réactiver, modifier le rôle.
+**Critères :**
+- [ ] Chaque route exige sa propre permission ; la liste n'expose aucune donnée sensible.
+- [ ] Suspendre un compte révoque toutes ses sessions ; un compte suspendu ne peut plus se connecter.
+- [ ] Un administrateur ne peut ni se suspendre ni retirer ses propres droits d'administration.
+**Tests :** chaque route avec et sans permission, suspension puis connexion refusée, garde-fous sur soi-même.
+
+### Jour 8 — Produit et documentation
+
+#### PROD-01 — Historique d'un combat
+**Statut :** ⏳ · **Dépend de :** EVT-03 · **Règles :** §6
+**Objectif :** `GET /api/v1/combats/:combatId/history` : les tours dans l'ordre (attaquant, dégâts, PV restants). Reprend BONUS-02.
+**Critères :**
+- [ ] Construit à partir du journal (EVT-03) ; combat en cours ou terminé.
+- [ ] Combat d'un autre joueur → même 404 `COMBAT_NOT_FOUND` qu'un inexistant.
+**Tests :** historique de l'exemple §8 (4 actions, 92 PV), isolation entre joueurs.
+
+#### PROD-02 — Classement des personnages
+**Statut :** ⏳ · **Dépend de :** CHAR-04 · **Règles :** §5
+**Objectif :** `GET /api/v1/leaderboard` : personnages triés par niveau puis XP.
+**Critères :**
+- [ ] Pagination et départage des égalités définis à l'audit (exception à `docs/conventions.md` §3).
+- [ ] Aucun identifiant de compte exposé.
+**Tests :** tri, égalités, pagination, paramètre inconnu → 400.
+
+#### DOC-02 — Documentation OpenAPI
+**Statut :** ⏳ · **Dépend de :** PROD-02
+**Objectif :** spécification OpenAPI 3.1 de toutes les routes, servie sur `/docs` (Swagger UI).
+**Critères :**
+- [ ] Un test échoue si une route de l'application est absente de la spécification.
+- [ ] Enveloppes de succès et d'erreur décrites une seule fois et réutilisées.
+**Tests :** couverture des routes, `/docs` répond.
+
+#### QUAL-02 — Revue finale
+**Statut :** ⏳ · **Dépend de :** DOC-02
+**Objectif :** vérifier la qualité de l'ensemble avant la livraison.
+**Critères :**
+- [ ] `/verifier` entièrement au vert ; revue `relecteur` sur tout le projet, problèmes corrigés ou listés.
+- [ ] Collection Postman (L5 à L8) exécutée par le Runner sur une base fraîchement initialisée ; README à jour.
+**Tests :** exécution complète.
+
 ---
-
-## 5. Bonus (si du temps reste, dans cet ordre)
-
-| Ticket | Contenu |
-|---|---|
-| BONUS-01 | Déconnexion (`POST /api/v1/auth/logout`, 204, révocation de la session) |
-| BONUS-02 | Historique des actions d'un combat |
-| BONUS-03 | Attribution par un événement de domaine interne `CombatWon` |
