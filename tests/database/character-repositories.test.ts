@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createCreateCharacter } from '../../src/application/characters/create-character'
-import type { PrismaClient } from '../../src/infrastructure/prisma/client'
-import { findStartingZoneId } from '../../src/infrastructure/prisma/find-starting-zone-id'
-import { createPrismaUnitOfWork } from '../../src/infrastructure/prisma/prisma-unit-of-work'
-import { seedReferenceData } from '../../src/infrastructure/prisma/seed-reference-data'
+import { createCreateCharacter } from '../../src/contexts/characters/app/use-cases/create-character'
+import type { PrismaClient } from '../../src/platform/prisma/client'
+import { findStartingZoneId } from '../../src/contexts/world/infra/find-starting-zone-id'
+import { createPrismaUnitOfWork } from '../../src/platform/prisma/prisma-unit-of-work'
+import { seedReferenceData } from '../../src/platform/prisma/seed-reference-data'
 import {
     type CharacterContractContext,
     describeCharacterRepositoryContract,

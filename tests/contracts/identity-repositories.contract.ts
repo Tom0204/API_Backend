@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import type { UnitOfWork } from '../../src/application/ports/unit-of-work'
-import { Account } from '../../src/domain/identity/account'
-import { Email } from '../../src/domain/identity/email'
-import { Session } from '../../src/domain/identity/session'
+import type { AppTransaction } from '../../src/platform/transaction'
+import type { UnitOfWork } from '../../src/shared/app/unit-of-work'
+import { Account } from '../../src/contexts/identity/domain/account'
+import { Email } from '../../src/contexts/identity/domain/email'
+import { Session } from '../../src/contexts/identity/domain/session'
 
 export interface ContractContext {
-    unitOfWork: UnitOfWork
+    unitOfWork: UnitOfWork<AppTransaction>
     /** Email unique à ce test, dans un domaine que le nettoyage reconnaît. */
     uniqueEmail(): Email
 }

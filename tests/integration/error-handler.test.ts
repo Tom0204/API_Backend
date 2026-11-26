@@ -1,9 +1,9 @@
 import express from 'express'
 import request from 'supertest'
 import { describe, expect, it } from 'vitest'
-import { DomainError, type DomainErrorKind } from '../../src/domain/shared/domain-error'
-import { asyncHandler } from '../../src/interfaces/http/async-handler'
-import { errorHandler } from '../../src/interfaces/http/middlewares/error-handler'
+import { DomainError, type DomainErrorKind } from '../../src/shared/domain/domain-error'
+import { asyncHandler } from '../../src/platform/http/async-handler'
+import { errorHandler } from '../../src/platform/http/middlewares/error-handler'
 
 function appThrowing(error: unknown) {
     const app = express()

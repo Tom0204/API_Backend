@@ -1,49 +1,55 @@
 # Architecture et exemple de référence
 
 Règles non négociables : `AGENTS.md` §4. Ce document montre **la forme à imiter** pour tout nouveau code.
-L'exemple suit le cas « créer un personnage » (CHAR-02) à travers les quatre couches. Le premier lot (ARCH-01)
-produit ce squelette réel ; il est validé avant tout autre ticket.
+L'exemple suit « créer un personnage » (CHAR-02) à travers les couches, puis la fin de combat pour la
+collaboration entre contextes. Organisation : **Clean Architecture par contexte** (DDD), avec un noyau commun.
 
 ## 1. Arborescence
 
 ```text
 src/
-├── domain/                       # aucune dépendance technique
-│   ├── shared/                   # DomainError, game-rules.ts (paramètres de rules.md)
-│   ├── identity/                 # Account, Email, AccountRepository
-│   ├── characters/               # Character, CharacterName, Progression, Stats, CharacterClass, CharacterRepository
-│   ├── world/                    # Zone, MonsterTemplate, WorldRepository
-│   ├── combat/                   # Combat, Combatant, CombatRepository
-│   └── inventory/                # Inventory, ItemStack, InventoryRepository
-├── application/
-│   ├── ports/                    # UnitOfWork, PasswordHasher, Clock, RandomSource, TokenGenerator
-│   ├── identity/                 # register-account.ts, login.ts, authenticate.ts
-│   ├── characters/               # create-character.ts, list-my-characters.ts, get-character-stats.ts
-│   ├── world/  combat/  inventory/
-├── infrastructure/
-│   ├── prisma/                   # client.ts, prisma-unit-of-work.ts, prisma-<agrégat>-repository.ts
-│   └── security/  system/        # argon2-password-hasher.ts, system-clock.ts, crypto-random-source.ts
-├── interfaces/http/
-│   ├── app.ts                    # createApp(useCases) : middlewares, routes, gestion d'erreurs
-│   ├── middlewares/              # require-auth.ts, validate.ts, error-handler.ts, request-logger.ts
-│   └── characters/               # character.routes.ts, character.controller.ts, character.schemas.ts, character.presenter.ts
+├── shared/                          # noyau commun : ne dépend d'aucun contexte
+│   ├── domain/                      # domain-error.ts, game-rules.ts (paramètres de rules.md)
+│   └── app/                         # unit-of-work.ts (UnitOfWork<R>), clock.ts, random-source.ts, auth-context.ts
+├── contexts/
+│   ├── identity/                    # comptes, sessions, authentification
+│   ├── characters/                  # classes, personnages, statistiques, progression
+│   ├── world/                       # zones, modèles de monstres et leur butin
+│   ├── combat/                      # combat tour par tour, récompenses de victoire
+│   └── inventory/                   # inventaires, piles d'objets
+│       ├── domain/                  # agrégats, objets-valeurs, règles, erreurs métier
+│       ├── app/
+│       │   ├── use-cases/           # un cas d'usage par fichier : entrée, sortie, execute
+│       │   ├── interfaces/          # repositories, outils, besoins envers un autre contexte
+│       │   ├── services/            # ce que le contexte offre aux autres
+│       │   └── utils/               # fonctions partagées par plusieurs cas d'usage
+│       ├── api/                     # routes, contrôleurs, schémas Zod, présentateurs
+│       └── infra/                   # repositories Prisma, adaptateurs (argon2, jetons)
+├── platform/                        # technique commune et assemblage
+│   ├── http/                        # app.ts, http-response.ts, request-auth.ts, middlewares/
+│   ├── health/                      # GET /health (technique, hors contexte)
+│   ├── prisma/                      # client.ts, prisma-unit-of-work.ts, prisma-errors.ts, seed-reference-data.ts
+│   ├── system/  logging/            # system-clock.ts, crypto-random-source.ts, logger.ts
+│   └── transaction.ts               # seul endroit qui relie les contextes
 ├── config/environment.ts
-└── main.ts                       # composition
+└── main.ts                          # composition
 tests/
-├── unit/domain/  unit/application/  integration/  database/
-├── fakes/                        # repositories et ports en mémoire, UnitOfWork en mémoire
+├── unit/domain/  unit/application/  unit/infrastructure/  integration/  database/
+├── contracts/                       # même contrat pour les repositories en mémoire et Prisma
+├── fakes/                           # UnitOfWork en mémoire, ports factices, panne injectée
 └── architecture.test.ts
 ```
 
-Nommage : fichiers en kebab-case ; une classe ou une fonction exportée principale par fichier ;
-un cas d'usage = un fichier = une fonction `createXxx(deps)` qui renvoie `execute(...)`.
+Nommage : fichiers en kebab-case ; une fonction ou une classe exportée principale par fichier ;
+un cas d'usage = un fichier = une fonction `createXxx(deps)` qui renvoie `execute(input)`.
+Un dossier n'existe que s'il contient quelque chose.
 
-## 2. Domaine
+## 2. Domaine (`contexts/X/domain/`, `shared/domain/`)
 
 ### Erreur métier
 
 ```ts
-// src/domain/shared/domain-error.ts
+// src/shared/domain/domain-error.ts
 export type DomainErrorKind = 'UNAUTHENTICATED' | 'NOT_FOUND' | 'CONFLICT' | 'RULE_VIOLATION'
 
 export class DomainError extends Error {
@@ -57,9 +63,7 @@ export class DomainError extends Error {
 ### Objet-valeur
 
 ```ts
-// src/domain/characters/character-name.ts
-import { CHARACTER_NAME_PATTERN } from '../shared/game-rules'
-
+// src/contexts/characters/domain/character-name.ts
 export class CharacterName {
     private constructor(readonly value: string) {}
 
@@ -80,149 +84,156 @@ export class CharacterName {
 ### Agrégat
 
 ```ts
-// src/domain/characters/character.ts
-export interface CharacterProps {
-    id: string
-    accountId: string
-    classId: string
-    zoneId: string
-    name: CharacterName
-    progression: Progression // objet-valeur : niveau + XP dans le niveau (rules.md §5)
-}
-
+// src/contexts/characters/domain/character.ts
 export class Character {
     private constructor(private props: CharacterProps) {}
 
     /** Création : niveau 1, XP 0, zone de départ (rules.md §4). L'identifiant est attribué par la base. */
-    static create(input: { accountId: string; classId: string; startingZoneId: string; name: CharacterName }) {
-        return { ...input, zoneId: input.startingZoneId, progression: Progression.initial() }
-    }
+    static create(input: { accountId: string; classId: string; startingZoneId: string; name: CharacterName }): NewCharacter
 
-    static restore(props: CharacterProps): Character {
-        return new Character(props)
-    }
+    static restore(props: CharacterProps): Character
 
-    isOwnedBy(accountId: string): boolean {
-        return this.props.accountId === accountId
-    }
+    isOwnedBy(accountId: string): boolean
 
     /** Seule façon de modifier l'XP : aucune route ne l'expose (rules.md §5). */
-    gainExperience(amount: number): number {
-        const { progression, levelsGained } = this.props.progression.gain(amount)
-        this.props = { ...this.props, progression }
-        return levelsGained
-    }
+    gainExperience(amount: number): number
 
-    get snapshot(): Readonly<CharacterProps> {
-        return this.props
-    }
+    get snapshot(): Readonly<CharacterProps>
 }
 ```
 
-### Port du repository (défini par le domaine)
-
-```ts
-// src/domain/characters/character-repository.ts
-export interface CharacterRepository {
-    findById(id: string): Promise<Character | undefined>
-    /** Dans une transaction : verrouille la ligne jusqu'à la fin de la transaction. */
-    findByIdForUpdate(id: string): Promise<Character | undefined>
-    /** Dans une transaction : verrouille le compte, puis compte ses personnages. */
-    countByAccountForUpdate(accountId: string): Promise<number>
-    isNameTaken(normalizedName: string): Promise<boolean>
-    insert(character: ReturnType<typeof Character.create>): Promise<Character>
-    save(character: Character): Promise<void>
-}
-```
-
-## 3. Application
+## 3. Application (`contexts/X/app/`)
 
 ### Ports
 
-```ts
-// src/application/ports/unit-of-work.ts
-export interface Repositories {
-    characters: CharacterRepository
-    classes: CharacterClassRepository
-    combats: CombatRepository
-    inventories: InventoryRepository
-}
+Les interfaces dont les cas d'usage ont besoin vivent dans `app/interfaces/` du contexte (repositories, outils
+techniques) ; les ports communs vivent dans `shared/app/`.
 
-/** Exécute `work` dans une transaction : tout est validé, ou tout est annulé si une erreur est levée. */
-export interface UnitOfWork {
-    run<T>(work: (repositories: Repositories) => Promise<T>): Promise<T>
+```ts
+// src/shared/app/unit-of-work.ts
+/** `R` : ce que la transaction met à disposition ; chaque cas d'usage n'y déclare que ce qu'il utilise. */
+export interface UnitOfWork<R> {
+    run<T>(work: (transaction: R) => Promise<T>): Promise<T>
 }
 ```
 
 ### Cas d'usage
 
 ```ts
-// src/application/characters/create-character.ts
-export interface CreateCharacterCommand {
+// src/contexts/characters/app/use-cases/create-character.ts
+export interface CreateCharacterInput {
     accountId: string // toujours tiré du jeton, jamais du corps
     name: string
     classId: string
 }
 
-export function createCreateCharacter({ unitOfWork, startingZoneId }: { unitOfWork: UnitOfWork; startingZoneId: string }) {
+type Transaction = { characters: CharacterRepository; classes: CharacterClassRepository }
+
+export function createCreateCharacter({ unitOfWork, startingZoneId }: { unitOfWork: UnitOfWork<Transaction>; startingZoneId: string }) {
     return {
-        execute: (command: CreateCharacterCommand) =>
+        execute: (input: CreateCharacterInput): Promise<CharacterOutput> =>
             unitOfWork.run(async ({ characters, classes }) => {
-                if (!(await classes.findById(command.classId))) {
-                    throw new DomainError('CLASS_NOT_FOUND', 'RULE_VIOLATION', 'Class not found')
-                }
+                if (!(await classes.findById(input.classId))) throw characterErrors.classNotFound()
                 // Verrou sur le compte : deux créations simultanées s'exécutent l'une après l'autre.
-                if ((await characters.countByAccountForUpdate(command.accountId)) >= MAX_CHARACTERS_PER_ACCOUNT) {
-                    throw new DomainError('CHARACTER_LIMIT_REACHED', 'CONFLICT', 'Character limit reached')
+                if ((await characters.countByAccountForUpdate(input.accountId)) >= MAX_CHARACTERS_PER_ACCOUNT) {
+                    throw characterErrors.limitReached()
                 }
-                const name = CharacterName.create(command.name)
-                if (await characters.isNameTaken(name.normalized)) {
-                    throw new DomainError('CHARACTER_NAME_TAKEN', 'CONFLICT', 'Character name already taken')
-                }
-                return characters.insert(
-                    Character.create({ accountId: command.accountId, classId: command.classId, startingZoneId, name })
+                const name = CharacterName.create(input.name)
+                if (await characters.isNameTaken(name.normalized)) throw characterErrors.nameTaken()
+                const character = await characters.insert(
+                    Character.create({ accountId: input.accountId, classId: input.classId, startingZoneId, name })
                 )
+                return toCharacterOutput(character) // sortie simple : jamais l'entité
             })
     }
 }
 ```
 
 Points à retenir : le cas d'usage **orchestre** (droits, transaction, ordre des contrôles) ; les **règles** sont dans
-le domaine ; il ne connaît ni HTTP ni Prisma. Une violation d'unicité levée par la base en concurrence est traduite
-en `DomainError` par le repository Prisma.
+le domaine ; il ne connaît ni HTTP ni Prisma ; il renvoie une **sortie simple** définie dans `app/` (ici
+`app/utils/character-output.ts`, partagée par plusieurs cas d'usage).
 
-## 4. Infrastructure
+## 4. Collaboration entre contextes
+
+Un contexte n'importe jamais un autre contexte. Exemple : le combat a besoin d'un personnage (statistiques, verrou, XP).
+
+**1. Le consommateur déclare son besoin, dans ses termes :**
 
 ```ts
-// src/infrastructure/prisma/prisma-unit-of-work.ts
-export function createPrismaUnitOfWork(prisma: PrismaClient): UnitOfWork {
+// src/contexts/combat/app/interfaces/combat-fighters.ts
+export interface Fighter { id: string; zoneId: string; stats: CombatantStats }
+
+export interface CombatFighters {
+    lockOwned(characterId: string, accountId: string): Promise<Fighter | undefined>
+    isOwnedBy(characterId: string, accountId: string): Promise<boolean>
+    grantExperience(characterId: string, amount: number): Promise<ExperienceGain>
+}
+```
+
+**2. Le propriétaire de la donnée le satisfait, avec ses propres règles, sans importer le consommateur :**
+
+```ts
+// src/contexts/characters/app/services/combat-fighters.ts
+export function createCombatFighters({ characters, classes }: { characters: CharacterRepository; classes: CharacterClassRepository }) {
+    return {
+        async lockOwned(characterId: string, accountId: string) {
+            const character = await characters.findByIdForUpdate(characterId)
+            if (!character?.isOwnedBy(accountId)) return undefined
+            const stats = Stats.forLevel(/* classe du personnage */, character.snapshot.progression.level)
+            return { id: character.id, zoneId: character.snapshot.zoneId, stats: { maxHp: stats.hp, /* … */ } }
+        },
+        // isOwnedBy, grantExperience (Character.gainExperience puis save)
+    }
+}
+```
+
+**3. Seul `platform/transaction.ts` les relie, sur une même transaction ; TypeScript y vérifie la compatibilité :**
+
+```ts
+// src/platform/transaction.ts
+export function withContextServices(repositories: AppRepositories): AppTransaction {
+    const fighters: CombatFighters = createCombatFighters(repositories)
+    const monsters: CombatMonsters = createCombatMonsters(repositories)
+    const loot: CombatLoot = createCombatLoot(repositories)
+    const characterOwners: CharacterOwners = createCharacterOwners(repositories)
+    return { ...repositories, fighters, monsters, loot, characterOwners }
+}
+```
+
+Contrats actuels : `combat` attend `CombatFighters` (characters), `CombatMonsters` (world) et `CombatLoot`
+(inventory) ; `inventory` attend `CharacterOwners` (characters). La fin de combat modifie trois agrégats dans **un
+seul** `UnitOfWork` : action, puis XP (verrou sur le personnage après celui du combat), puis butin.
+
+## 5. Infrastructure (`contexts/X/infra/`, `platform/prisma/`)
+
+```ts
+// src/platform/prisma/prisma-unit-of-work.ts
+export function createPrismaUnitOfWork(prisma: PrismaClient): UnitOfWork<AppTransaction> {
     return {
         run: (work) =>
             prisma.$transaction((tx) =>
-                work({
+                work(withContextServices({
                     characters: createPrismaCharacterRepository(tx),
-                    classes: createPrismaCharacterClassRepository(tx),
-                    combats: createPrismaCombatRepository(tx),
-                    inventories: createPrismaInventoryRepository(tx)
-                })
+                    // … un repository par agrégat, tous sur la même transaction
+                }))
             )
     }
 }
 
-// Extrait de prisma-character-repository.ts : verrou réel, puis reconstruction de l'agrégat.
+// Extrait de contexts/characters/infra/prisma-character-repository.ts : verrou réel, puis reconstruction.
 async countByAccountForUpdate(accountId) {
     await tx.$queryRaw`SELECT id FROM accounts WHERE id = ${accountId}::uuid FOR UPDATE`
     return tx.character.count({ where: { accountId } })
 }
 ```
 
-La version en mémoire de `UnitOfWork` (`tests/fakes/`) exécute `work` sur une copie des données et ne la conserve
-que si `work` réussit : mêmes garanties d'annulation pour les tests sans base.
+La version en mémoire de `UnitOfWork` (`tests/fakes/`) exécute `work` sur une copie des données, avec les mêmes
+services entre contextes, et ne la conserve que si `work` réussit : mêmes garanties d'annulation sans base.
 
-## 5. Interface HTTP
+## 6. Interface HTTP (`contexts/X/api/`, `platform/http/`)
 
 ```ts
-// src/interfaces/http/characters/character.schemas.ts
+// src/contexts/characters/api/character.schemas.ts
 export const createCharacterBody = z.strictObject({
     name: z.string().regex(CHARACTER_NAME_PATTERN, 'Must be 3 to 16 letters (A-Z, a-z)'),
     classId: z.uuid('Must be a valid UUID')
@@ -234,16 +245,22 @@ create: asyncHandler(async (req, res) => {
     res.status(201).json(success('Character created successfully', presentCharacter(character)))
 })
 
-// middlewares/error-handler.ts : seule traduction des erreurs du domaine.
+// character.presenter.ts : ne connaît que la sortie du cas d'usage (liste blanche, dates en ISO).
+export function presentCharacter({ id, name, classId, zoneId, level, experience, createdAt }: CharacterOutput)
+
+// platform/http/middlewares/error-handler.ts : seule traduction des erreurs du domaine.
 const STATUS_BY_KIND = { UNAUTHENTICATED: 401, NOT_FOUND: 404, CONFLICT: 409, RULE_VIOLATION: 422 } as const
 ```
 
-## 6. Composition
+`getAuth(req)` vient de `platform/http/request-auth.ts` ; le middleware `requireAuth` (contexte identity) y range
+l'identité de la requête. Ainsi aucune route n'importe le contexte identity.
+
+## 7. Composition
 
 ```ts
 // src/main.ts : seul fichier qui connaît toutes les implémentations.
 const prisma = createPrismaClient(env.DATABASE_URL)
-const unitOfWork = createPrismaUnitOfWork(prisma)
+const unitOfWork = createPrismaUnitOfWork(prisma) // UnitOfWork<AppTransaction>, accepté par chaque cas d'usage
 const app = createApp({
     createCharacter: createCreateCharacter({ unitOfWork, startingZoneId: await findStartingZoneId(prisma) }),
     // … un cas d'usage par route
@@ -252,24 +269,32 @@ const app = createApp({
 
 Les tests HTTP appellent `createApp` avec les mêmes cas d'usage construits sur `tests/fakes/`.
 
-## 7. Règle de dépendance (test)
+## 8. Règle de dépendance (test)
 
-```ts
-// tests/architecture.test.ts
-const FORBIDDEN = {
-    'src/domain': [/from 'express'/, /generated\/prisma/, /from 'zod'/, /\/application\//, /\/infrastructure\//, /\/interfaces\//],
-    'src/application': [/from 'express'/, /generated\/prisma/, /\/infrastructure\//, /\/interfaces\//]
-}
-// Pour chaque fichier .ts de chaque dossier : aucun import ne correspond à un motif interdit.
-```
+`tests/architecture.test.ts` classe chaque fichier de `src/` dans une zone (`shared`, `contexts/X/couche`,
+`platform`, racine) et vérifie chaque import :
 
-## 8. Où placer une nouvelle règle ?
+| Depuis | Peut importer |
+|---|---|
+| `shared/domain` | `shared/domain` |
+| `shared/app` | `shared/` |
+| `X/domain` | `X/domain`, `shared/domain` |
+| `X/app` | `X/domain`, `X/app`, `shared/` |
+| `X/api` | `X/app`, `X/api`, `shared/`, `platform/http` ; de `X/domain` : erreurs, et constantes dans `*.schemas.ts` |
+| `X/infra` | `X/domain`, `X/app`, `X/infra`, `shared/`, `platform/prisma`, client généré |
+| `platform/`, `main.ts`, `config/` | tout |
+
+Jamais `contexts/X` → `contexts/Y`. Paquets : aucun dans `shared`, `domain` et `app` ; `express` et `zod` seuls dans
+`api` ; libres dans `infra` et `platform`. Des cas volontairement fautifs vérifient le test lui-même.
+
+## 9. Où placer une nouvelle règle ?
 
 | Question | Emplacement |
 |---|---|
-| Valeur chiffrée de `rules.md` ? | `domain/shared/game-rules.ts` |
-| Calcul ou invariant sur un seul agrégat ? | Méthode de l'agrégat ou de l'objet-valeur |
-| Calcul qui concerne deux agrégats sans état (dégâts entre deux combattants) ? | Fonction pure du domaine (`domain/combat/damage.ts`) |
-| Droits, ordre des contrôles, transaction, appel de plusieurs repositories ? | Cas d'usage |
-| Format d'entrée HTTP ? | Schéma Zod |
-| Forme de sortie ? | Présentateur |
+| Valeur chiffrée de `rules.md` ? | `shared/domain/game-rules.ts` |
+| Calcul ou invariant sur un seul agrégat ? | Méthode de l'agrégat ou de l'objet-valeur du contexte |
+| Calcul entre deux participants sans état (dégâts) ? | Fonction pure du domaine (`contexts/combat/domain/damage.ts`) |
+| Droits, ordre des contrôles, transaction, plusieurs repositories ? | Cas d'usage |
+| Besoin d'une donnée d'un autre contexte ? | Contrat dans `X/app/interfaces`, service dans le contexte propriétaire, lien dans `platform/transaction.ts` |
+| Format d'entrée HTTP ? | Schéma Zod (`X/api/*.schemas.ts`) |
+| Forme de sortie ? | Sortie du cas d'usage (`X/app`) puis présentateur (`X/api`) |

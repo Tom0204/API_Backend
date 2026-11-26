@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { experienceRequired, Progression } from '../../../../src/domain/characters/progression'
+import { experienceRequired, Progression } from '../../../../src/contexts/characters/domain/progression'
 
 describe('experienceRequired (rules.md §5)', () => {
     it('reproduit le tableau XP pour n → n + 1 et l’XP cumulée', () => {

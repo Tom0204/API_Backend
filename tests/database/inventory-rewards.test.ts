@@ -1,14 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createCreateCharacter } from '../../src/application/characters/create-character'
-import { createPlayCombatAction } from '../../src/application/combat/play-combat-action'
-import { createStartCombat } from '../../src/application/combat/start-combat'
-import type { UnitOfWork } from '../../src/application/ports/unit-of-work'
-import type { PrismaClient } from '../../src/infrastructure/prisma/client'
-import { findStartingZoneId } from '../../src/infrastructure/prisma/find-starting-zone-id'
-import { createPrismaUnitOfWork } from '../../src/infrastructure/prisma/prisma-unit-of-work'
-import { seedReferenceData } from '../../src/infrastructure/prisma/seed-reference-data'
-import { createSystemClock } from '../../src/infrastructure/system/system-clock'
+import { createCreateCharacter } from '../../src/contexts/characters/app/use-cases/create-character'
+import { createPlayCombatAction } from '../../src/contexts/combat/app/use-cases/play-combat-action'
+import { createStartCombat } from '../../src/contexts/combat/app/use-cases/start-combat'
+import type { AppTransaction } from '../../src/platform/transaction'
+import type { UnitOfWork } from '../../src/shared/app/unit-of-work'
+import type { PrismaClient } from '../../src/platform/prisma/client'
+import { findStartingZoneId } from '../../src/contexts/world/infra/find-starting-zone-id'
+import { createPrismaUnitOfWork } from '../../src/platform/prisma/prisma-unit-of-work'
+import { seedReferenceData } from '../../src/platform/prisma/seed-reference-data'
+import { createSystemClock } from '../../src/platform/system/system-clock'
 import { uniqueCharacterName } from '../contracts/character-repositories.contract'
 import { describeInventoryRepositoryContract, type InventoryContractContext } from '../contracts/inventory-repositories.contract'
 import { withFailingInventorySave } from '../fakes/failing-unit-of-work'
@@ -16,7 +17,7 @@ import { FixedRandom } from '../fakes/fake-ports'
 import { connectTestDatabase, deleteTestAccounts, TEST_EMAIL_DOMAIN } from './test-database'
 
 let prisma: PrismaClient
-let unitOfWork: UnitOfWork
+let unitOfWork: UnitOfWork<AppTransaction>
 let context: InventoryContractContext
 let wolfId: string
 let createPlayer: () => Promise<{ accountId: string; characterId: string }>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { Character } from '../../../../src/domain/characters/character'
-import { CharacterName } from '../../../../src/domain/characters/character-name'
-import { Progression } from '../../../../src/domain/characters/progression'
+import { Character } from '../../../../src/contexts/characters/domain/character'
+import { CharacterName } from '../../../../src/contexts/characters/domain/character-name'
+import { Progression } from '../../../../src/contexts/characters/domain/progression'
 
 describe('Character', () => {
     it('création : niveau 1, XP 0, zone de départ, propriétaire fourni', () => {

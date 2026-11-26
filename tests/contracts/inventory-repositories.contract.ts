@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { UnitOfWork } from '../../src/application/ports/unit-of-work'
-import type { InventoryItem } from '../../src/domain/inventory/item-stack'
+import type { AppTransaction } from '../../src/platform/transaction'
+import type { UnitOfWork } from '../../src/shared/app/unit-of-work'
+import type { InventoryItem } from '../../src/contexts/inventory/domain/item-stack'
 
 export interface InventoryContractContext {
-    unitOfWork: UnitOfWork
+    unitOfWork: UnitOfWork<AppTransaction>
     /** Crée un compte et un personnage propres au test ; renvoie l'identifiant du personnage. */
     createCharacter(): Promise<string>
     /** Objets du seed, par code. */

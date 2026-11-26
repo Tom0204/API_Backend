@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createCreateCharacter } from '../../../../src/application/characters/create-character'
-import { createGetCharacterStats } from '../../../../src/application/characters/get-character-stats'
-import { createGetMyCharacter } from '../../../../src/application/characters/get-my-character'
-import { createListClasses } from '../../../../src/application/characters/list-classes'
-import { createListMyCharacters } from '../../../../src/application/characters/list-my-characters'
-import { Account } from '../../../../src/domain/identity/account'
-import { Email } from '../../../../src/domain/identity/email'
+import { createCreateCharacter } from '../../../../src/contexts/characters/app/use-cases/create-character'
+import { createGetCharacterStats } from '../../../../src/contexts/characters/app/use-cases/get-character-stats'
+import { createGetMyCharacter } from '../../../../src/contexts/characters/app/use-cases/get-my-character'
+import { createListClasses } from '../../../../src/contexts/characters/app/use-cases/list-classes'
+import { createListMyCharacters } from '../../../../src/contexts/characters/app/use-cases/list-my-characters'
+import { Account } from '../../../../src/contexts/identity/domain/account'
+import { Email } from '../../../../src/contexts/identity/domain/email'
 import { IN_MEMORY_STARTING_ZONE_ID, InMemoryDatabase } from '../../../fakes/in-memory-unit-of-work'
 
 function setup() {
@@ -30,7 +30,7 @@ describe('ListClasses', () => {
     it('renvoie les 3 classes triées par nom', async () => {
         const classes = await setup().listClasses.execute()
 
-        expect(classes.map((c) => c.snapshot.name)).toEqual(['Guerrier', 'Mage', 'Voleur'])
+        expect(classes.map((c) => c.name)).toEqual(['Guerrier', 'Mage', 'Voleur'])
     })
 })
 
@@ -45,9 +45,11 @@ describe('CreateCharacter', () => {
     it('crée un personnage niveau 1, XP 0, dans la zone de départ, pour le compte du jeton', async () => {
         const character = await ctx.createCharacter.execute({ accountId, name: 'Thrall', classId: ctx.warrior })
 
-        expect(character.snapshot).toMatchObject({ accountId, classId: ctx.warrior, zoneId: IN_MEMORY_STARTING_ZONE_ID })
-        expect(character.snapshot.name.value).toBe('Thrall')
-        expect(character.snapshot.progression).toMatchObject({ level: 1, experience: 0 })
+        expect(character).toMatchObject({ classId: ctx.warrior, zoneId: IN_MEMORY_STARTING_ZONE_ID })
+        // Le propriétaire n'est pas exposé en sortie : on le vérifie en base.
+        expect(ctx.database.state.characters.find((c) => c.id === character.id)?.accountId).toBe(accountId)
+        expect(character.name).toBe('Thrall')
+        expect(character).toMatchObject({ level: 1, experience: 0 })
     })
 
     it('classe inconnue → CLASS_NOT_FOUND (RULE_VIOLATION)', async () => {
@@ -120,7 +122,7 @@ describe('Consultation des personnages', () => {
         await ctx.createCharacter.execute({ accountId: bob, name: 'Thrall', classId: ctx.warrior })
         await ctx.createCharacter.execute({ accountId: alice, name: 'Arthas', classId: ctx.warrior })
 
-        const names = (await ctx.listMyCharacters.execute({ accountId: alice })).map((c) => c.snapshot.name.value)
+        const names = (await ctx.listMyCharacters.execute({ accountId: alice })).map((c) => c.name)
         expect(names).toEqual(['Jaina', 'Arthas'])
     })
 
@@ -139,6 +141,6 @@ describe('Consultation des personnages', () => {
 
         const { stats } = await ctx.getCharacterStats.execute({ accountId: alice, characterId: character.id })
 
-        expect(stats).toMatchObject({ hp: 80, mana: 100, attack: 10, defense: 4, speed: 10 })
+        expect(stats).toMatchObject({ maxHp: 80, maxMana: 100, attack: 10, defense: 4, speed: 10 })
     })
 })

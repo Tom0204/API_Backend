@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll } from 'vitest'
-import { Email } from '../../src/domain/identity/email'
-import type { PrismaClient } from '../../src/infrastructure/prisma/client'
-import { createPrismaUnitOfWork } from '../../src/infrastructure/prisma/prisma-unit-of-work'
+import { Email } from '../../src/contexts/identity/domain/email'
+import type { PrismaClient } from '../../src/platform/prisma/client'
+import { createPrismaUnitOfWork } from '../../src/platform/prisma/prisma-unit-of-work'
 import { type ContractContext, describeIdentityRepositoryContract } from '../contracts/identity-repositories.contract'
 import { connectTestDatabase, deleteTestAccounts, TEST_EMAIL_DOMAIN } from './test-database'
 

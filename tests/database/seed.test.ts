@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { PrismaClient } from '../../src/infrastructure/prisma/client'
-import { seedReferenceData } from '../../src/infrastructure/prisma/seed-reference-data'
+import type { PrismaClient } from '../../src/platform/prisma/client'
+import { seedReferenceData } from '../../src/platform/prisma/seed-reference-data'
 import { connectTestDatabase } from './test-database'
 
 describe('seed des données de référence', () => {

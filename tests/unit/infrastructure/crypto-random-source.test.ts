@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createCryptoRandomSource } from '../../../src/infrastructure/system/crypto-random-source'
+import { createCryptoRandomSource } from '../../../src/platform/system/crypto-random-source'
 
 describe('createCryptoRandomSource', () => {
     it('renvoie des nombres dans [0, 1[, répartis sur tout l’intervalle', () => {

@@ -1,7 +1,7 @@
-import type { Clock } from '../../src/application/ports/clock'
-import type { PasswordHasher } from '../../src/application/ports/password-hasher'
-import type { RandomSource } from '../../src/application/ports/random-source'
-import type { TokenGenerator } from '../../src/application/ports/token-generator'
+import type { Clock } from '../../src/shared/app/clock'
+import type { PasswordHasher } from '../../src/contexts/identity/app/interfaces/password-hasher'
+import type { RandomSource } from '../../src/shared/app/random-source'
+import type { TokenGenerator } from '../../src/contexts/identity/app/interfaces/token-generator'
 
 /** Hachage instantané et lisible, qui compte les vérifications (égalisation des délais, D7). */
 export class FakePasswordHasher implements PasswordHasher {

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { beforeEach } from 'vitest'
-import { createCreateCharacter } from '../../../../src/application/characters/create-character'
-import { Account } from '../../../../src/domain/identity/account'
-import { Email } from '../../../../src/domain/identity/email'
+import { createCreateCharacter } from '../../../../src/contexts/characters/app/use-cases/create-character'
+import { Account } from '../../../../src/contexts/identity/domain/account'
+import { Email } from '../../../../src/contexts/identity/domain/email'
 import { uniqueCharacterName } from '../../../contracts/character-repositories.contract'
 import {
     describeInventoryRepositoryContract,

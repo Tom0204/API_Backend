@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Email, EMAIL_MAX_LENGTH } from '../../../../src/domain/identity/email'
+import { Email, EMAIL_MAX_LENGTH } from '../../../../src/contexts/identity/domain/email'
 
 describe('Email', () => {
     it('est normalisé en minuscules', () => {

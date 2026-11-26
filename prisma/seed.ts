@@ -1,6 +1,6 @@
 // `npm run db:seed` : données de référence de rules.md, sur la base de DATABASE_URL. Idempotent.
-import { createPrismaClient } from '../src/infrastructure/prisma/client'
-import { seedReferenceData } from '../src/infrastructure/prisma/seed-reference-data'
+import { createPrismaClient } from '../src/platform/prisma/client'
+import { seedReferenceData } from '../src/platform/prisma/seed-reference-data'
 
 try {
     process.loadEnvFile()

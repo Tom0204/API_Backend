@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createAuthenticate } from '../../../../src/application/identity/authenticate'
-import { createGetCurrentAccount } from '../../../../src/application/identity/get-current-account'
-import { createLogin } from '../../../../src/application/identity/login'
-import { createRegisterAccount } from '../../../../src/application/identity/register-account'
-import { SESSION_DURATION_MS } from '../../../../src/domain/identity/session'
+import { createAuthenticate } from '../../../../src/contexts/identity/app/use-cases/authenticate'
+import { createGetCurrentAccount } from '../../../../src/contexts/identity/app/use-cases/get-current-account'
+import { createLogin } from '../../../../src/contexts/identity/app/use-cases/login'
+import { createRegisterAccount } from '../../../../src/contexts/identity/app/use-cases/register-account'
+import { SESSION_DURATION_MS } from '../../../../src/contexts/identity/domain/session'
 import { FakePasswordHasher, FakeTokenGenerator, FixedClock } from '../../../fakes/fake-ports'
 import { InMemoryDatabase } from '../../../fakes/in-memory-unit-of-work'
 
@@ -35,7 +35,7 @@ describe('RegisterAccount', () => {
     it('crée le compte avec un email en minuscules et un mot de passe haché', async () => {
         const account = await ctx.registerAccount.execute({ email: 'Alice@Example.com', password: PASSWORD })
 
-        expect(account.snapshot.email.value).toBe('alice@example.com')
+        expect(account.email).toBe('alice@example.com')
         expect(ctx.database.state.accounts).toHaveLength(1)
         expect(ctx.database.state.accounts[0]?.passwordHash).toBe(`hashed:${PASSWORD}`)
         expect(JSON.stringify(ctx.database.state)).not.toContain(`"${PASSWORD}"`)
@@ -128,7 +128,7 @@ describe('Authenticate et GetCurrentAccount', () => {
         const account = await ctx.getCurrentAccount.execute(auth)
 
         expect(auth).toEqual({ accountId: ctx.database.state.accounts[0]?.id })
-        expect(account.snapshot.email.value).toBe('alice@example.com')
+        expect(account.email).toBe('alice@example.com')
     })
 
     it('jeton inconnu → UNAUTHENTICATED', async () => {

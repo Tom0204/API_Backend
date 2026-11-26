@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CharacterName } from '../../../../src/domain/characters/character-name'
+import { CharacterName } from '../../../../src/contexts/characters/domain/character-name'
 
 describe('CharacterName (rules.md §4)', () => {
     it.each(['Bob', 'Thrall', 'Abcdefghijklmnop'])('accepte %s', (raw) => {

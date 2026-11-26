@@ -50,17 +50,20 @@ Les emails et noms sont générés à chaque exécution : aucune remise à zéro
 
 ## Architecture
 
-Clean Architecture et DDD. Détail et exemple de référence : `docs/architecture.md`.
+Clean Architecture et DDD, organisées **par contexte**. Détail et exemple de référence : `docs/architecture.md`.
 
-| Couche | Contient | Dépend de |
+| Dossier | Contient | Dépend de |
 |---|---|---|
-| `src/domain/` | Agrégats, objets-valeurs, règles de jeu, erreurs métier, interfaces des repositories | rien |
-| `src/application/` | Un cas d'usage par action ; ports `UnitOfWork`, `Clock`, `RandomSource`, `PasswordHasher`, `TokenGenerator` | `domain` |
-| `src/infrastructure/` | Prisma (repositories, transactions), Argon2, horloge, aléatoire, logs | `domain`, `application` |
-| `src/interfaces/http/` | Routes Express, schémas Zod, présentateurs, middlewares | `application` |
+| `src/shared/` | Noyau commun : `DomainError`, paramètres de `rules.md`, ports `UnitOfWork`, `Clock`, `RandomSource` | rien |
+| `src/contexts/X/domain/` | Agrégats, objets-valeurs, règles de jeu, erreurs métier du contexte | `shared` |
+| `src/contexts/X/app/` | Cas d'usage (entrée, sortie, `execute`), `interfaces/` (repositories, outils, besoins envers les autres contextes), `services/` (ce que le contexte offre aux autres), `utils/` | son `domain`, `shared` |
+| `src/contexts/X/api/` | Routes Express, schémas Zod, présentateurs | son `app`, `platform/http` |
+| `src/contexts/X/infra/` | Repositories Prisma, adaptateurs (Argon2, jetons) | son `app`, `platform/prisma` |
+| `src/platform/` | Express (`app.ts`, middlewares), Prisma (`UnitOfWork`), horloge, aléatoire, logs, et `transaction.ts` : seul endroit qui relie les contextes | tout |
 | `src/main.ts` | Composition : construit l'infrastructure et l'injecte | tout |
 
-La règle de dépendance est vérifiée par `tests/architecture.test.ts`.
+**Aucun contexte n'importe un autre contexte** : il déclare ce dont il a besoin dans ses `app/interfaces`, et le contexte
+qui possède la donnée le fournit par un service. Règle vérifiée par `tests/architecture.test.ts`.
 
 | Contexte | Rôle |
 |---|---|

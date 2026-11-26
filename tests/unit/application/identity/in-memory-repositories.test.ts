@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { beforeEach } from 'vitest'
-import { Email } from '../../../../src/domain/identity/email'
+import { Email } from '../../../../src/contexts/identity/domain/email'
 import { type ContractContext, describeIdentityRepositoryContract } from '../../../contracts/identity-repositories.contract'
 import { InMemoryDatabase } from '../../../fakes/in-memory-unit-of-work'
 

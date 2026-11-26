@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { createCreateCharacter } from '../../../../src/application/characters/create-character'
-import { createGetMyCombat } from '../../../../src/application/combat/get-my-combat'
-import { createPlayCombatAction } from '../../../../src/application/combat/play-combat-action'
-import { createStartCombat } from '../../../../src/application/combat/start-combat'
-import { createGetMyInventory } from '../../../../src/application/inventory/get-my-inventory'
-import type { UnitOfWork } from '../../../../src/application/ports/unit-of-work'
-import { Account } from '../../../../src/domain/identity/account'
-import { Email } from '../../../../src/domain/identity/email'
+import { createCreateCharacter } from '../../../../src/contexts/characters/app/use-cases/create-character'
+import { createGetMyCombat } from '../../../../src/contexts/combat/app/use-cases/get-my-combat'
+import { createPlayCombatAction } from '../../../../src/contexts/combat/app/use-cases/play-combat-action'
+import { createStartCombat } from '../../../../src/contexts/combat/app/use-cases/start-combat'
+import { createGetMyInventory } from '../../../../src/contexts/inventory/app/use-cases/get-my-inventory'
+import type { AppTransaction } from '../../../../src/platform/transaction'
+import type { UnitOfWork } from '../../../../src/shared/app/unit-of-work'
+import { Account } from '../../../../src/contexts/identity/domain/account'
+import { Email } from '../../../../src/contexts/identity/domain/email'
 import { withFailingInventorySave } from '../../../fakes/failing-unit-of-work'
 import { FixedClock, FixedRandom } from '../../../fakes/fake-ports'
 import { IN_MEMORY_STARTING_ZONE_ID, InMemoryDatabase } from '../../../fakes/in-memory-unit-of-work'
@@ -44,14 +45,14 @@ function setup() {
     }
     const playUntilFinished = async (player: { accountId: string }, combatId: string, action = playCombatAction) => {
         let view = await action.execute({ accountId: player.accountId, combatId, type: 'ATTACK' })
-        while (view.combat.snapshot.status === 'IN_PROGRESS') {
+        while (view.combat.status === 'IN_PROGRESS') {
             view = await action.execute({ accountId: player.accountId, combatId, type: 'ATTACK' })
         }
         return view
     }
     const inventoryOf = (characterId: string) =>
         database.state.inventoryItems.filter((item) => item.characterId === characterId).map(({ itemId, quantity }) => ({ itemId, quantity }))
-    const playWith = (unitOfWork: UnitOfWork) => createPlayCombatAction({ unitOfWork, clock, random })
+    const playWith = (unitOfWork: UnitOfWork<AppTransaction>) => createPlayCombatAction({ unitOfWork, clock, random })
 
     return {
         database,
@@ -79,10 +80,10 @@ describe('REWARD-01 — récompenses de victoire', () => {
 
         const final = await ctx.playCombatAction.execute({ accountId: player.accountId, combatId, type: 'ATTACK' })
 
-        expect(final.combat.snapshot.status).toBe('VICTORY')
-        expect(final.combat.snapshot.character.hp).toBe(92)
-        expect(final.rewards).toMatchObject({ experienceGained: 25, levelsGained: 0, progression: { level: 1, experience: 25 } })
-        expect(final.rewards?.item).toMatchObject({ item: { code: 'wolf-pelt', name: 'Peau de loup' }, quantity: 1 })
+        expect(final.combat.status).toBe('VICTORY')
+        expect(final.combat.character.hp).toBe(92)
+        expect(final.rewards).toMatchObject({ experienceGained: 25, levelsGained: 0, level: 1, experience: 25 })
+        expect(final.rewards?.item).toMatchObject({ code: 'wolf-pelt', name: 'Peau de loup', quantity: 1 })
         expect(ctx.random.draws).toBe(1)
         expect(ctx.record(player.characterId)).toMatchObject({ level: 1, experience: 25 })
         expect(ctx.inventoryOf(player.characterId)).toEqual([{ itemId: ctx.database.item('wolf-pelt').id, quantity: 1 }])
@@ -109,8 +110,8 @@ describe('REWARD-01 — récompenses de victoire', () => {
 
         const final = await ctx.playUntilFinished(player, combat.id)
 
-        expect(final.combat.snapshot.status).toBe('VICTORY')
-        expect(final.rewards).toMatchObject({ experienceGained: 60, levelsGained: 1, progression: { level: 2, experience: 50 } })
+        expect(final.combat.status).toBe('VICTORY')
+        expect(final.rewards).toMatchObject({ experienceGained: 60, levelsGained: 1, level: 2, experience: 50 })
         expect(ctx.record(player.characterId)).toMatchObject({ level: 2, experience: 50 })
     })
 
@@ -123,8 +124,8 @@ describe('REWARD-01 — récompenses de victoire', () => {
 
         const final = await ctx.playUntilFinished(player, combat.id)
 
-        expect(final.rewards).toMatchObject({ levelsGained: 0, progression: { level: 10, experience: 0 } })
-        expect(final.rewards?.item?.item.code).toBe('wolf-pelt')
+        expect(final.rewards).toMatchObject({ levelsGained: 0, level: 10, experience: 0 })
+        expect(final.rewards?.item?.code).toBe('wolf-pelt')
         expect(ctx.record(player.characterId)).toMatchObject({ level: 10, experience: 0 })
     })
 
@@ -136,7 +137,7 @@ describe('REWARD-01 — récompenses de victoire', () => {
 
         const final = await ctx.playUntilFinished(player, combat.id)
 
-        expect(final.combat.snapshot.status).toBe('DEFEAT')
+        expect(final.combat.status).toBe('DEFEAT')
         expect(final.rewards).toBeNull()
         expect(ctx.random.draws).toBe(0)
         expect(ctx.record(player.characterId)).toMatchObject({ level: 1, experience: 0 })
@@ -201,7 +202,7 @@ describe('INV-01 — GetMyInventory', () => {
     it('vide à la création, puis objets empilés après deux victoires', async () => {
         const ctx = setup()
         const player = await ctx.newPlayer()
-        expect((await ctx.getMyInventory.execute(player)).items).toEqual([])
+        expect(await ctx.getMyInventory.execute(player)).toEqual([])
         ctx.random.value = 0.31
 
         for (let i = 0; i < 2; i += 1) {
@@ -210,7 +211,7 @@ describe('INV-01 — GetMyInventory', () => {
         }
         const inventory = await ctx.getMyInventory.execute(player)
 
-        expect(inventory.items.map(({ item, quantity }) => [item.code, quantity])).toEqual([['wolf-pelt', 2]])
+        expect(inventory.map(({ code, quantity }) => [code, quantity])).toEqual([['wolf-pelt', 2]])
     })
 
     it("personnage d'un autre joueur ou inexistant → même CHARACTER_NOT_FOUND (404)", async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { Combat, type CombatProps } from '../../../../src/domain/combat/combat'
-import type { CombatantStats } from '../../../../src/domain/combat/combatant'
-import { computeDamage } from '../../../../src/domain/combat/damage'
+import { Combat, type CombatProps } from '../../../../src/contexts/combat/domain/combat'
+import type { CombatantStats } from '../../../../src/contexts/combat/domain/combatant'
+import { computeDamage } from '../../../../src/contexts/combat/domain/damage'
 
 // Statistiques de rules.md §3 et §8.
 const WARRIOR_L1: CombatantStats = { maxHp: 120, attack: 12, defense: 8, speed: 8 }

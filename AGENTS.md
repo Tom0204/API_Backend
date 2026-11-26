@@ -61,29 +61,44 @@ Aucune autre dépendance sans décision D validée.
 
 Détail et exemple complet : `docs/architecture.md`. Les règles ci-dessous sont **non négociables**.
 
-| Couche | Contient | Peut importer |
+**Organisation par contexte** (`identity`, `characters`, `world`, `combat`, `inventory`) : `src/contexts/<contexte>/<couche>/`.
+Un dossier n'existe que s'il contient quelque chose.
+
+| Dossier | Contient | Peut importer |
 |---|---|---|
-| `src/domain/` | Agrégats, entités, objets-valeurs, règles de jeu, erreurs métier, **interfaces** des repositories | Rien d'autre que `domain/` |
-| `src/application/` | Un cas d'usage par action, ports techniques (`UnitOfWork`, `PasswordHasher`, `Clock`, `RandomSource`, `TokenGenerator`) | `domain/` |
-| `src/infrastructure/` | Implémentations Prisma, argon2, horloge, aléatoire | `domain/`, `application/` |
-| `src/interfaces/http/` | Routes, controllers, schémas Zod, présentateurs (DTO), middlewares | `application/` (et les types d'erreur du domaine) |
+| `src/shared/domain/` | `DomainError`, `game-rules.ts` (paramètres de `rules.md`) | `shared/domain/` |
+| `src/shared/app/` | Ports communs : `UnitOfWork<R>`, `Clock`, `RandomSource`, `AuthContext` | `shared/` |
+| `contexts/X/domain/` | Agrégats, entités, objets-valeurs, règles de jeu, erreurs métier | `X/domain`, `shared/domain` |
+| `contexts/X/app/use-cases/` | Un cas d'usage par fichier : type d'entrée, type de sortie, `execute` | `X/domain`, `X/app`, `shared` |
+| `contexts/X/app/interfaces/` | Ce dont les cas d'usage ont besoin : repositories, outils techniques, **données d'un autre contexte** | idem |
+| `contexts/X/app/services/` | Ce que X offre aux autres contextes, dans la forme de **leur** interface (typage structurel) | idem |
+| `contexts/X/app/utils/` | Fonctions partagées par plusieurs cas d'usage (conversion en sortie, contrôle de propriété) | idem |
+| `contexts/X/api/` | Routes, contrôleurs, schémas Zod, présentateurs | `X/app`, `shared`, `platform/http` ; de `X/domain`, seulement les erreurs et, dans les `*.schemas.ts`, les constantes de validation |
+| `contexts/X/infra/` | Implémentations Prisma, adaptateurs (Argon2, jetons) | `X/domain`, `X/app`, `shared`, `platform/prisma`, client généré |
+| `src/platform/` | Express, middlewares communs, `UnitOfWork` Prisma, horloge, aléatoire, logs, `transaction.ts` | Tout |
 | `src/main.ts` | Composition : construit l'infrastructure et l'injecte | Tout |
 
-- **Règle de dépendance** vérifiée par le test `tests/architecture.test.ts` : `domain/` n'importe ni Express, ni Prisma,
-  ni Zod, ni `application/` ; `application/` n'importe ni Express ni Prisma.
-- **Contextes :** `identity`, `characters`, `world`, `combat`, `inventory`. Un dossier par contexte dans chaque couche.
+- **Règle de dépendance** vérifiée par `tests/architecture.test.ts` : `domain/` et `app/` n'importent aucun paquet
+  (ni Express, ni Prisma, ni Zod, ni module `node:`) ; **un contexte n'importe jamais un autre contexte**.
+- **Entre contextes :** le contexte consommateur déclare un contrat dans ses `app/interfaces` (ex. `CombatFighters`),
+  dans ses propres termes ; le contexte propriétaire le satisfait par un service qui applique ses propres règles.
+  Seul `platform/transaction.ts` relie services et contrats, et TypeScript y vérifie leur compatibilité.
+- **Cas d'usage :** `createXxx(deps)` renvoie `execute(input)`. Il déclare un type `Transaction` avec **uniquement** ce
+  qu'il utilise (`UnitOfWork<Transaction>`) et renvoie une **sortie simple** : jamais une entité du domaine.
+  Les présentateurs ne connaissent que ces sorties.
 - **Agrégats :** modifiés uniquement par leur racine ; référencés entre eux **par identifiant**.
   Une transaction ne modifie qu'un agrégat, sauf la fin de combat (combat + personnage + inventaire), coordonnée par
-  un seul cas d'usage dans un `UnitOfWork`.
+  un seul cas d'usage dans un `UnitOfWork`, à travers les contrats de combat.
 - **Objets-valeurs** immuables, validés à la construction (`CharacterName.create(...)`).
 - **Règles de jeu** en méthodes du domaine ou fonctions pures ; paramètres de `rules.md` dans
-  `src/domain/shared/game-rules.ts`, jamais de valeur magique ailleurs.
+  `src/shared/domain/game-rules.ts`, jamais de valeur magique ailleurs.
 - **Concurrence :** tout état lu puis modifié est verrouillé dans la transaction (`SELECT … FOR UPDATE` via
-  `findByIdForUpdate`). Limite de 5 personnages : verrou sur le compte. Combat : verrou sur le combat.
+  `findByIdForUpdate`). Limite de 5 personnages : verrou sur le compte. Combat : verrou sur le combat, puis sur le
+  personnage (toujours dans cet ordre).
 - **Erreurs :** le domaine lève `DomainError(code, kind)` sans connaître HTTP ; un seul middleware traduit `kind`
-  en statut. Une erreur de programmation (invariant violé) est une erreur ordinaire → 500.
+  en statut. Une erreur de programmation (invariant violé) est une erreur ordinaire → 500. Un code partagé par deux
+  contextes (`CHARACTER_NOT_FOUND`) est déclaré dans chacun, avec le même code et le même message.
 - **Lecture simple** (classes, monstres d'une zone) : un cas d'usage de lecture appelle un repository, sans agrégat.
-- Pas de bus d'événements, de CQRS, de mapper générique ni d'héritage de « BaseEntity » : inutile en 4 jours.
 - TypeScript strict, sans `any` ni transtypage injustifié.
 
 ## 5. Sécurité (règles permanentes)
@@ -92,7 +107,7 @@ Détail et exemple complet : `docs/architecture.md`. Les règles ci-dessous sont
 - Aucune réponse ne contient de secret, hash, jeton non voulu, variable d'environnement, trace ou requête SQL.
 - Aucun log ne contient de mot de passe, jeton, cookie, corps ou paramètre de requête, ni d'URL de connexion.
 - Propriété vérifiée dans chaque cas d'usage : la ressource d'un autre joueur est traitée exactement comme une
-  ressource inexistante. Il n'existe pas de rôle administrateur dans ce projet.
+  ressource inexistante.
 - Tout champ ou paramètre inconnu est refusé (400), jamais ignoré.
 
 ## 6. Tests

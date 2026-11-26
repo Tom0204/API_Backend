@@ -1,4 +1,4 @@
-import { createPrismaClient, type PrismaClient } from '../../src/infrastructure/prisma/client'
+import { createPrismaClient, type PrismaClient } from '../../src/platform/prisma/client'
 
 const TEST_DATABASE_NAME = 'mmorpg_test'
 

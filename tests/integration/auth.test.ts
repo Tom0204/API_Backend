@@ -1,6 +1,6 @@
 import request from 'supertest'
 import { describe, expect, it } from 'vitest'
-import { SESSION_DURATION_MS } from '../../src/domain/identity/session'
+import { SESSION_DURATION_MS } from '../../src/contexts/identity/domain/session'
 import { buildTestApp, VALID_PASSWORD } from '../fakes/test-app'
 
 async function registerAndLogin(app: ReturnType<typeof buildTestApp>['app'], email = 'alice@example.com') {

@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createCreateCharacter } from '../../../../src/application/characters/create-character'
-import { createGetCharacterStats } from '../../../../src/application/characters/get-character-stats'
-import { createGetMyCombat } from '../../../../src/application/combat/get-my-combat'
-import { createPlayCombatAction } from '../../../../src/application/combat/play-combat-action'
-import { createStartCombat } from '../../../../src/application/combat/start-combat'
-import { createListZoneMonsters } from '../../../../src/application/world/list-zone-monsters'
-import { Account } from '../../../../src/domain/identity/account'
-import { Email } from '../../../../src/domain/identity/email'
+import { createCreateCharacter } from '../../../../src/contexts/characters/app/use-cases/create-character'
+import { createGetCharacterStats } from '../../../../src/contexts/characters/app/use-cases/get-character-stats'
+import { createGetMyCombat } from '../../../../src/contexts/combat/app/use-cases/get-my-combat'
+import { createPlayCombatAction } from '../../../../src/contexts/combat/app/use-cases/play-combat-action'
+import { createStartCombat } from '../../../../src/contexts/combat/app/use-cases/start-combat'
+import { createListZoneMonsters } from '../../../../src/contexts/world/app/use-cases/list-zone-monsters'
+import { Account } from '../../../../src/contexts/identity/domain/account'
+import { Email } from '../../../../src/contexts/identity/domain/email'
 import { FixedClock, FixedRandom } from '../../../fakes/fake-ports'
 import { IN_MEMORY_STARTING_ZONE_ID, InMemoryDatabase } from '../../../fakes/in-memory-unit-of-work'
 
@@ -48,10 +48,10 @@ describe('ListZoneMonsters', () => {
     it('Clairière : loup, sanglier, bandit triés par niveau, avec les valeurs du seed', async () => {
         const monsters = await setup().listZoneMonsters.execute({ zoneId: IN_MEMORY_STARTING_ZONE_ID })
 
-        expect(monsters.map((m) => m.snapshot)).toEqual([
-            expect.objectContaining({ code: 'wolf', name: 'Loup', level: 1, hp: 40, attack: 8, defense: 2, speed: 9, xpReward: 25 }),
-            expect.objectContaining({ code: 'boar', name: 'Sanglier', level: 2, hp: 60, attack: 10, defense: 5, speed: 6, xpReward: 40 }),
-            expect.objectContaining({ code: 'bandit', name: 'Bandit', level: 3, hp: 75, attack: 12, defense: 6, speed: 11, xpReward: 60 })
+        expect(monsters).toEqual([
+            expect.objectContaining({ code: 'wolf', name: 'Loup', level: 1, stats: { hp: 40, attack: 8, defense: 2, speed: 9 }, xpReward: 25 }),
+            expect.objectContaining({ code: 'boar', name: 'Sanglier', level: 2, stats: { hp: 60, attack: 10, defense: 5, speed: 6 }, xpReward: 40 }),
+            expect.objectContaining({ code: 'bandit', name: 'Bandit', level: 3, stats: { hp: 75, attack: 12, defense: 6, speed: 11 }, xpReward: 60 })
         ])
     })
 
@@ -75,9 +75,9 @@ describe('StartCombat', () => {
         const { combat, lastTurn } = await ctx.startCombat.execute({ accountId, characterId, monsterId: ctx.database.monsterId('wolf') })
 
         expect(lastTurn).toEqual({ characterDamage: null, monsterDamage: 7 })
-        expect(combat.snapshot).toMatchObject({ status: 'IN_PROGRESS', characterId, monsterName: 'Loup' })
-        expect(combat.snapshot.character.stats).toEqual({ maxHp: 120, attack: 12, defense: 8, speed: 8 })
-        expect(combat.snapshot.character.hp).toBe(113)
+        expect(combat).toMatchObject({ status: 'IN_PROGRESS', characterId, monsterName: 'Loup' })
+        expect(combat.character).toEqual({ hp: 113, maxHp: 120, attack: 12, defense: 8, speed: 8 })
+        expect(combat.character.hp).toBe(113)
     })
 
     it('personnage plus rapide : aucun tour joué', async () => {
@@ -137,8 +137,8 @@ describe('PlayCombatAction et GetMyCombat', () => {
         const final = await act()
 
         expect(final.lastTurn).toEqual({ characterDamage: 11, monsterDamage: null })
-        expect(final.combat.snapshot).toMatchObject({ status: 'VICTORY', finishedAt: ctx.clock.now() })
-        expect(final.combat.snapshot.character.hp).toBe(92)
+        expect(final.combat).toMatchObject({ status: 'VICTORY', finishedAt: ctx.clock.now() })
+        expect(final.combat.character.hp).toBe(92)
         await expect(act()).rejects.toMatchObject({ code: 'COMBAT_FINISHED', kind: 'RULE_VIOLATION' })
         await expect(
             ctx.startCombat.execute({ accountId, characterId, monsterId: ctx.database.monsterId('wolf') })
@@ -150,12 +150,12 @@ describe('PlayCombatAction et GetMyCombat', () => {
         const { combat } = await ctx.startCombat.execute({ accountId, characterId, monsterId: ctx.database.monsterId('bandit') })
 
         let view = await ctx.playCombatAction.execute({ accountId, combatId: combat.id, type: 'ATTACK' })
-        while (view.combat.snapshot.status === 'IN_PROGRESS') {
+        while (view.combat.status === 'IN_PROGRESS') {
             view = await ctx.playCombatAction.execute({ accountId, combatId: combat.id, type: 'ATTACK' })
         }
 
-        expect(view.combat.snapshot.status).toBe('DEFEAT')
-        expect(view.combat.snapshot.character.hp).toBe(0)
+        expect(view.combat.status).toBe('DEFEAT')
+        expect(view.combat.character.hp).toBe(0)
         const { stats } = await ctx.getCharacterStats.execute({ accountId, characterId })
         expect([stats.currentHp, stats.currentMana]).toEqual([80, 100])
     })
@@ -168,8 +168,8 @@ describe('PlayCombatAction et GetMyCombat', () => {
         const view = await ctx.getMyCombat.execute({ accountId, combatId: combat.id })
 
         expect(view.lastTurn).toBeNull()
-        expect(view.combat.snapshot.character.hp).toBe(106)
-        expect(view.combat.snapshot.monster.hp).toBe(29)
+        expect(view.combat.character.hp).toBe(106)
+        expect(view.combat.monster.hp).toBe(29)
     })
 
     it("combat d'un autre joueur ou inexistant → même COMBAT_NOT_FOUND, même s'il est terminé", async () => {

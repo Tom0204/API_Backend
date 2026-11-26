@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Inventory } from '../../../../src/domain/inventory/inventory'
-import { ItemStack } from '../../../../src/domain/inventory/item-stack'
+import { Inventory } from '../../../../src/contexts/inventory/domain/inventory'
+import { ItemStack } from '../../../../src/contexts/inventory/domain/item-stack'
 
 const PELT = { id: 'item-pelt', code: 'wolf-pelt', name: 'Peau de loup' }
 const TUSK = { id: 'item-tusk', code: 'boar-tusk', name: 'Défense de sanglier' }

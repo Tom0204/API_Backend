@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Stats } from '../../../../src/domain/characters/stats'
+import { Stats } from '../../../../src/contexts/characters/domain/stats'
 
 // Valeurs de rules.md §3 (hp, mana, attaque, défense, vitesse).
 const CLASSES = {

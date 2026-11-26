@@ -1,31 +1,32 @@
 import { randomUUID } from 'node:crypto'
-import type { Repositories, UnitOfWork } from '../../src/application/ports/unit-of-work'
-import { Character } from '../../src/domain/characters/character'
-import { CharacterClass } from '../../src/domain/characters/character-class'
-import type { CharacterClassRepository } from '../../src/domain/characters/character-class-repository'
-import { characterErrors } from '../../src/domain/characters/character-errors'
-import { CharacterName } from '../../src/domain/characters/character-name'
-import type { CharacterRepository } from '../../src/domain/characters/character-repository'
-import { Progression } from '../../src/domain/characters/progression'
-import type { StatBlock } from '../../src/domain/characters/stats'
-import { Account } from '../../src/domain/identity/account'
-import type { AccountRepository } from '../../src/domain/identity/account-repository'
-import { Email } from '../../src/domain/identity/email'
-import { identityErrors } from '../../src/domain/identity/identity-errors'
-import { Session } from '../../src/domain/identity/session'
-import type { SessionRepository } from '../../src/domain/identity/session-repository'
-import { Inventory } from '../../src/domain/inventory/inventory'
-import type { InventoryRepository } from '../../src/domain/inventory/inventory-repository'
-import { ItemStack } from '../../src/domain/inventory/item-stack'
-import { Combat, type CombatStatus } from '../../src/domain/combat/combat'
-import { combatErrors } from '../../src/domain/combat/combat-errors'
-import type { CombatRepository } from '../../src/domain/combat/combat-repository'
-import { Combatant, type CombatantStats } from '../../src/domain/combat/combatant'
-import { STARTING_ZONE_CODE } from '../../src/domain/shared/game-rules'
-import { MonsterTemplate, type MonsterTemplateProps } from '../../src/domain/world/monster-template'
-import type { WorldRepository } from '../../src/domain/world/world-repository'
-import { Zone, type ZoneProps } from '../../src/domain/world/zone'
-import { CHARACTER_CLASSES, ITEMS, MONSTER_TEMPLATES, ZONES } from '../../src/infrastructure/prisma/seed-reference-data'
+import { type AppRepositories, type AppTransaction, withContextServices } from '../../src/platform/transaction'
+import type { UnitOfWork } from '../../src/shared/app/unit-of-work'
+import { Character } from '../../src/contexts/characters/domain/character'
+import { CharacterClass } from '../../src/contexts/characters/domain/character-class'
+import type { CharacterClassRepository } from '../../src/contexts/characters/app/interfaces/character-class-repository'
+import { characterErrors } from '../../src/contexts/characters/domain/character-errors'
+import { CharacterName } from '../../src/contexts/characters/domain/character-name'
+import type { CharacterRepository } from '../../src/contexts/characters/app/interfaces/character-repository'
+import { Progression } from '../../src/contexts/characters/domain/progression'
+import type { StatBlock } from '../../src/contexts/characters/domain/stats'
+import { Account } from '../../src/contexts/identity/domain/account'
+import type { AccountRepository } from '../../src/contexts/identity/app/interfaces/account-repository'
+import { Email } from '../../src/contexts/identity/domain/email'
+import { identityErrors } from '../../src/contexts/identity/domain/identity-errors'
+import { Session } from '../../src/contexts/identity/domain/session'
+import type { SessionRepository } from '../../src/contexts/identity/app/interfaces/session-repository'
+import { Inventory } from '../../src/contexts/inventory/domain/inventory'
+import type { InventoryRepository } from '../../src/contexts/inventory/app/interfaces/inventory-repository'
+import { ItemStack } from '../../src/contexts/inventory/domain/item-stack'
+import { Combat, type CombatStatus } from '../../src/contexts/combat/domain/combat'
+import { combatErrors } from '../../src/contexts/combat/domain/combat-errors'
+import type { CombatRepository } from '../../src/contexts/combat/app/interfaces/combat-repository'
+import { Combatant, type CombatantStats } from '../../src/contexts/combat/domain/combatant'
+import { STARTING_ZONE_CODE } from '../../src/shared/domain/game-rules'
+import { MonsterTemplate, type MonsterTemplateProps } from '../../src/contexts/world/domain/monster-template'
+import type { WorldRepository } from '../../src/contexts/world/app/interfaces/world-repository'
+import { Zone, type ZoneProps } from '../../src/contexts/world/domain/zone'
+import { CHARACTER_CLASSES, ITEMS, MONSTER_TEMPLATES, ZONES } from '../../src/platform/prisma/seed-reference-data'
 
 interface AccountRecord {
     id: string
@@ -122,7 +123,7 @@ function seedMonsters(zones: ZoneProps[], items: ItemRecord[]): MonsterRecord[] 
  * - les unités de travail s'exécutent l'une après l'autre (équivalent des verrous et des index uniques).
  * Les classes sont celles du seed (mêmes valeurs, identifiants propres à chaque instance).
  */
-export class InMemoryDatabase implements UnitOfWork {
+export class InMemoryDatabase implements UnitOfWork<AppTransaction> {
     state: InMemoryState = {
         accounts: [],
         sessions: [],
@@ -142,10 +143,10 @@ export class InMemoryDatabase implements UnitOfWork {
     }
     private queue: Promise<unknown> = Promise.resolve()
 
-    run<T>(work: (repositories: Repositories) => Promise<T>): Promise<T> {
+    run<T>(work: (transaction: AppTransaction) => Promise<T>): Promise<T> {
         const next = this.queue.then(async () => {
             const draft = structuredClone(this.state)
-            const result = await work(createRepositories(draft))
+            const result = await work(withContextServices(createRepositories(draft)))
             this.state = draft
             return result
         })
@@ -180,7 +181,7 @@ export class InMemoryDatabase implements UnitOfWork {
     }
 }
 
-function createRepositories(draft: InMemoryState): Repositories {
+function createRepositories(draft: InMemoryState): AppRepositories {
     return {
         accounts: createAccountRepository(draft),
         sessions: createSessionRepository(draft),

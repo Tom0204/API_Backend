@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import type { UnitOfWork } from '../../src/application/ports/unit-of-work'
-import { Character } from '../../src/domain/characters/character'
-import { CharacterName } from '../../src/domain/characters/character-name'
+import type { AppTransaction } from '../../src/platform/transaction'
+import type { UnitOfWork } from '../../src/shared/app/unit-of-work'
+import { Character } from '../../src/contexts/characters/domain/character'
+import { CharacterName } from '../../src/contexts/characters/domain/character-name'
 
 export interface CharacterContractContext {
-    unitOfWork: UnitOfWork
+    unitOfWork: UnitOfWork<AppTransaction>
     /** Crée un compte propre au test et renvoie son identifiant. */
     createAccount(): Promise<string>
     warriorClassId: string

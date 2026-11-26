@@ -4,7 +4,7 @@ import {
     PASSWORD_MAX_LENGTH,
     PASSWORD_MIN_LENGTH,
     passwordLength
-} from '../../../../src/domain/identity/password'
+} from '../../../../src/contexts/identity/domain/password'
 
 describe('NewPassword', () => {
     it(`accepte ${PASSWORD_MIN_LENGTH} et ${PASSWORD_MAX_LENGTH} caractères`, () => {

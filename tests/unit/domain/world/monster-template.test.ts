@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MonsterTemplate, type MonsterTemplateProps } from '../../../../src/domain/world/monster-template'
+import { MonsterTemplate, type MonsterTemplateProps } from '../../../../src/contexts/world/domain/monster-template'
 
 const PELT = { id: 'item-pelt', code: 'wolf-pelt', name: 'Peau de loup' }
 const WOLF: MonsterTemplateProps = {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Session, SESSION_DURATION_MS } from '../../../../src/domain/identity/session'
+import { Session, SESSION_DURATION_MS } from '../../../../src/contexts/identity/domain/session'
 
 describe('Session', () => {
     const now = new Date('2026-11-25T10:00:00.000Z')

@@ -1,7 +1,7 @@
 # Règles de jeu du MVP
 
 Toute valeur de ce document est un **paramètre** : le code la lit depuis un emplacement unique
-(`src/domain/shared/game-rules.ts` ou données de référence du seed), jamais répétée. Une règle absente d'ici
+(`src/shared/domain/game-rules.ts` ou données de référence du seed), jamais répétée. Une règle absente d'ici
 n'existe pas : aucun agent ne l'invente, elle passe par la section 11.
 Chaque exemple chiffré de ce document est un test automatisé obligatoire.
 

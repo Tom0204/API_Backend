@@ -1,6 +1,6 @@
 import { Writable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
-import { createLogger } from '../../src/infrastructure/logging/logger'
+import { createLogger } from '../../src/platform/logging/logger'
 
 describe('logger', () => {
     it("masque toute URL de connexion PostgreSQL, y compris dans le message et la pile d'une erreur", () => {

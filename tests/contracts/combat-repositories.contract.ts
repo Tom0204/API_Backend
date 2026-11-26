@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import type { UnitOfWork } from '../../src/application/ports/unit-of-work'
-import { Combat } from '../../src/domain/combat/combat'
+import type { AppTransaction } from '../../src/platform/transaction'
+import type { UnitOfWork } from '../../src/shared/app/unit-of-work'
+import { Combat } from '../../src/contexts/combat/domain/combat'
 
 export interface CombatContractContext {
-    unitOfWork: UnitOfWork
+    unitOfWork: UnitOfWork<AppTransaction>
     /** Crée un compte et un personnage propres au test ; renvoie l'identifiant du personnage. */
     createCharacter(): Promise<string>
     startingZoneId: string
@@ -36,7 +37,7 @@ export function describeCombatRepositoryContract(name: string, getContext: () =>
 
             expect(zone?.snapshot).toMatchObject({ code: 'clearing', name: 'Clairière', minLevel: 1, maxLevel: 3 })
             expect(monsters.map((m) => m.snapshot.code)).toEqual(['wolf', 'boar', 'bandit'])
-            expect(wolf?.combatStats).toEqual(WOLF)
+            expect(wolf?.snapshot).toMatchObject({ hp: WOLF.maxHp, attack: WOLF.attack, defense: WOLF.defense, speed: WOLF.speed })
             expect(wolf?.snapshot.loot).toEqual({ item: { id: expect.any(String), code: 'wolf-pelt', name: 'Peau de loup' }, chance: 0.5 })
             expect(monsters.map((m) => m.snapshot.loot?.item.code)).toEqual(['wolf-pelt', 'boar-tusk', 'bandit-badge'])
             expect(await ctx.unitOfWork.run(({ world }) => world.findZoneById(randomUUID()))).toBeUndefined()
